@@ -1,0 +1,25 @@
+{
+  "name": "bili-ticket-monitor",
+  "version": "1.0.0",
+  "description": "Bilibili 会员购余票监控（bili_ticket 签名）+ 直播大屏，零第三方依赖",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "bilibili",
+    "bili-ticket",
+    "ticket-monitor",
+    "会员购",
+    "余票监控",
+    "抢票"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_USERNAME/bili-ticket-monitor.git"
+  }
+}

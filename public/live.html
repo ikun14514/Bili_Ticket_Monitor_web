@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>余票监控</title>
+<style>
+  :root {
+    --bg: #000;
+    --accent: #fb7299;
+    --live: #ff2e63;
+    --warn: #ffb020;
+    --text: #f2f2f2;
+    --dim: #6a6a6a;
+    --line: rgba(255, 255, 255, 0.08);
+    --row-h: 150px;
+    --name-fs: 46px;
+    --sub-fs: 19px;
+    --badge-fs: 17px;
+    --idx-fs: 14px;
+    --dh: 21vh;
+    --dw: 14.6vh;
+    --df: 12.6vh;
+    --mono: "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    --sans: "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; background: var(--bg); color: var(--text);
+    font-family: var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(110% 70% at 50% -18%, rgba(251, 114, 153, 0.11), transparent 62%),
+      radial-gradient(70% 55% at 105% 108%, rgba(255, 46, 99, 0.07), transparent 62%);
+    transition: opacity 1s;
+  }
+  .screen {
+    position: relative; z-index: 1; height: 100%;
+    padding: 2.2vh 3vw 2.4vh; display: flex; flex-direction: column; gap: 1.2vh;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 2vw;
+    padding-bottom: 1.6vh; border-bottom: 1px solid var(--line); flex: 0 0 auto;
+  }
+  .brand { display: flex; align-items: baseline; gap: 1.2vw; min-width: 0; }
+  .pulse {
+    position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--live);
+    box-shadow: 0 0 16px var(--live); align-self: center; flex: 0 0 auto;
+  }
+  .pulse::after {
+    content: ""; position: absolute; inset: -7px; border-radius: 50%;
+    border: 1px solid var(--live); animation: ring 2.2s ease-out infinite;
+  }
+  @keyframes ring { 0% { transform: scale(.55); opacity: .9 } 100% { transform: scale(1.9); opacity: 0 } }
+  h1 {
+    font-size: 3.3vh; font-weight: 700; letter-spacing: .10em; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 40vw;
+  }
+  .tag {
+    font-family: var(--mono); font-size: 1.25vh; letter-spacing: .26em; color: #565656;
+    border: 1px solid var(--line); padding: .45vh .6vw; border-radius: 3px; white-space: nowrap;
+  }
+  .meta { display: flex; align-items: center; gap: 1.3vw; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+  .phase {
+    display: flex; align-items: center; gap: .45vw;
+    font-family: var(--mono); font-size: 1.35vh; letter-spacing: .08em;
+    padding: .55vh .8vw; border-radius: 4px; border: 1px solid var(--line); color: #7a7a7a;
+    transition: all .3s;
+  }
+  .phase i { width: 6px; height: 6px; border-radius: 50%; background: #555; }
+  .phase.rush { color: #ffd9e2; border-color: rgba(255, 46, 99, .5); background: rgba(255, 46, 99, .13); }
+  .phase.rush i { background: var(--live); box-shadow: 0 0 10px var(--live); animation: blink .5s steps(2) infinite; }
+  .phase.watch { color: #ffc9d4; border-color: rgba(255, 46, 99, .3); background: rgba(255, 46, 99, .07); }
+  .phase.watch i { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .phase.warmup { color: #f0d39a; border-color: rgba(255, 176, 32, .35); }
+  .phase.warmup i { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .phase.idle { color: #6b7c8c; border-color: rgba(110, 140, 170, .3); }
+  .phase.idle i { background: #46586a; box-shadow: none; }
+  .phase.blocked { color: #ffcf8f; border-color: rgba(255, 176, 32, .5); background: rgba(255, 176, 32, .1); }
+  .phase.blocked i { background: var(--warn); box-shadow: 0 0 8px var(--warn); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: .2 } }
+  .stat {
+    display: flex; align-items: center; gap: .5vw;
+    font-family: var(--mono); font-size: 1.55vh; color: #7a7a7a; letter-spacing: .04em;
+  }
+  .stat b { color: var(--accent); font-weight: 600; font-size: 1.85vh; }
+  .state-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #33d17a;
+    box-shadow: 0 0 10px #33d17a; margin-right: .3vw;
+  }
+  .state-dot.off { background: #4a4a4a; box-shadow: none; }
+  .clock-now {
+    font-family: var(--mono); font-size: 2.1vh; color: #c4c4c4;
+    font-variant-numeric: tabular-nums; letter-spacing: .08em;
+  }
+
+  /* ---------- countdown ---------- */
+  .cd {
+    flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2.8vh; min-height: 0; animation: fadeIn .6s ease-out;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+  .cd-head {
+    display: flex; align-items: center; gap: 1.2vw;
+    font-family: var(--mono); font-size: 1.8vh; letter-spacing: .38em; color: #9a9aa8;
+  }
+  .cd-head .dot-live {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--warn);
+    box-shadow: 0 0 12px var(--warn); animation: blink 1.6s steps(2) infinite;
+  }
+  .cd-clock {
+    display: flex; align-items: flex-start; gap: .9vw; margin: 1.2vh 0 .8vh;
+    position: relative; padding: 3vh 3.5vw;
+  }
+  .cd-clock::before {
+    content: ""; position: absolute; inset: -12% -4%;
+    background: radial-gradient(50% 58% at 50% 50%, rgba(255, 46, 99, .18), rgba(255, 46, 99, .04) 55%, transparent 75%);
+    filter: blur(26px); pointer-events: none; z-index: 0;
+  }
+
+  .unit { display: flex; flex-direction: column; align-items: center; gap: 1.1vh; }
+  .digits { display: flex; gap: .55vw; }
+  .unit-label {
+    font-family: var(--mono); font-size: 1.3vh; letter-spacing: .32em; color: #6e6e7d;
+    padding-left: .32em;
+  }
+
+  .digit {
+    position: relative; width: var(--dw); height: var(--dh);
+    perspective: 900px;
+    font-family: var(--mono); font-size: var(--df); font-weight: 700; line-height: 1;
+    filter: drop-shadow(0 14px 26px rgba(0, 0, 0, .75));
+  }
+  .digit .half {
+    position: absolute; left: 0; width: 100%; height: 50%; overflow: hidden;
+    background: linear-gradient(180deg, #2a2a38 0%, #16161f 96%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -14px 26px rgba(0, 0, 0, .45);
+  }
+  .digit .half.top {
+    top: 0; border-radius: 10px 10px 0 0;
+    border-bottom: 1.5px solid #05050a;
+  }
+  .digit .half.bottom {
+    bottom: 0; border-radius: 0 0 10px 10px;
+    background: linear-gradient(180deg, #0b0b11 0%, #1e1e29 100%);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .07), inset 0 16px 28px rgba(0, 0, 0, .5);
+  }
+  .digit .half span {
+    position: absolute; left: 0; width: 100%; height: 200%;
+    display: flex; align-items: center; justify-content: center;
+    padding-top: .17em;
+    color: #fbfbfe; text-shadow: 0 2px 18px rgba(255, 255, 255, .16), 0 0 40px rgba(251, 114, 153, .12);
+  }
+  .digit .half.top span { top: 0; }
+  .digit .half.bottom span { top: -100%; }
+
+  .digit .flip-layer {
+    position: absolute; left: 0; width: 100%; height: 50%; overflow: hidden;
+    backface-visibility: hidden; z-index: 2;
+    background: linear-gradient(180deg, #2a2a38 0%, #16161f 96%);
+  }
+  .digit .flip-layer span {
+    position: absolute; left: 0; width: 100%; height: 200%;
+    display: flex; align-items: center; justify-content: center;
+    padding-top: .17em;
+    color: #fbfbfe; text-shadow: 0 2px 18px rgba(255, 255, 255, .16), 0 0 40px rgba(251, 114, 153, .12);
+  }
+  .digit .flip-top { top: 0; transform-origin: 50% 100%; border-radius: 10px 10px 0 0; }
+  .digit .flip-top span { top: 0; }
+  .digit .flip-bottom {
+    top: 50%; transform-origin: 50% 0; transform: rotateX(90deg);
+    border-radius: 0 0 10px 10px;
+    background: linear-gradient(180deg, #0b0b11 0%, #1e1e29 100%);
+  }
+  .digit .flip-bottom span { top: -100%; }
+  .digit.flip .flip-top { animation: flipTop .26s ease-in forwards; }
+  .digit.flip .flip-bottom { animation: flipBottom .26s .26s ease-out forwards; }
+  @keyframes flipTop { from { transform: rotateX(0) } to { transform: rotateX(-90deg) } }
+  @keyframes flipBottom { from { transform: rotateX(90deg) } to { transform: rotateX(0) } }
+
+  .colon {
+    display: flex; flex-direction: column; justify-content: center; gap: 2.6vh;
+    height: var(--dh); padding: 0 .35vw;
+  }
+  .colon i {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--live);
+    box-shadow: 0 0 18px var(--live), 0 0 40px rgba(255, 46, 99, .5); transition: opacity .2s;
+  }
+  .colon.dim i { opacity: .25; }
+
+  .cd-target { text-align: center; margin-top: .4vh; }
+  .cd-name {
+    font-size: 3.4vh; font-weight: 600; color: #ececf2; letter-spacing: .02em;
+    max-width: 74vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cd-sub {
+    margin-top: 1vh; font-family: var(--mono); font-size: 1.7vh; color: #7d7d8b; letter-spacing: .05em;
+  }
+  .cd-sub b { color: var(--accent); font-weight: 500; }
+
+  /* 最后 60 秒 */
+  .cd.urgent .digit .half span,
+  .cd.urgent .digit .flip-layer span { color: #ff7a95; text-shadow: 0 0 26px rgba(255, 46, 99, .6); }
+  .cd.urgent .digit .half,
+  .cd.urgent .digit .flip-layer { background: linear-gradient(180deg, #2a121a 0%, #170a10 100%); }
+  .cd.urgent .colon i { animation: blink .5s steps(2) infinite; }
+  .cd.urgent .cd-head { color: #ff8fa5; }
+  .cd.urgent .cd-head .dot-live { background: var(--live); box-shadow: 0 0 14px var(--live); }
+
+  /* 开售爆发 */
+  .burst {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 200;
+    background: radial-gradient(46% 46% at 50% 50%, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 55%, transparent 78%);
+    animation: burstBg 1.5s ease-out forwards;
+  }
+  @keyframes burstBg { 0% { opacity: 0 } 15% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
+  .burst span {
+    letter-spacing: .1em;
+    font-size: 18vh; font-weight: 800; letter-spacing: .18em; color: #fff;
+    text-shadow: 0 0 60px rgba(255, 46, 99, .9), 0 0 140px rgba(255, 46, 99, .6);
+    animation: burst 1.4s cubic-bezier(.2, .8, .3, 1) forwards;
+  }
+  .burst::before {
+    content: ""; position: absolute; width: 20vh; height: 20vh; border-radius: 50%;
+    border: 2px solid var(--live);
+    animation: shockwave 1.3s ease-out forwards;
+  }
+  @keyframes burst {
+    0% { opacity: 0; transform: scale(.55); }
+    18% { opacity: 1; transform: scale(1.06); }
+    35% { transform: scale(1); }
+    75% { opacity: 1; }
+    100% { opacity: 0; transform: scale(1.1); }
+  }
+  @keyframes shockwave {
+    0% { opacity: .9; transform: scale(.3); }
+    100% { opacity: 0; transform: scale(9); }
+  }
+
+  .cdbar {
+    flex: 0 0 auto; display: none; align-items: center; gap: .9vw;
+    padding: .75vh 1vw; border: 1px solid rgba(255, 176, 32, .22); border-radius: 5px;
+    background: rgba(255, 176, 32, .045);
+    font-family: var(--mono); font-size: 1.4vh; color: #b9945a; letter-spacing: .04em;
+    animation: fadeIn .4s ease-out;
+  }
+  .cdbar.show { display: flex; }
+  .cdbar .k { color: #6f5c38; letter-spacing: .18em; font-size: 1.15vh; }
+  .cdbar b { color: #ffd08a; font-weight: 600; letter-spacing: .08em; font-size: 1.6vh; }
+  .cdbar .nm {
+    color: #9a9aa8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding-left: .9vw; margin-left: .3vw; border-left: 1px solid rgba(255, 176, 32, .18);
+  }
+
+  /* ---------- list ---------- */
+  .viewport {
+    flex: 1 1 auto; overflow: hidden; position: relative; min-height: 0;
+    display: flex; flex-direction: column; animation: fadeIn .5s ease-out;
+  }
+  /* flex-shrink:0 是关键：否则 18 行会被压缩到视口高度，文字重叠、底部半截行 */
+  .track { display: flex; flex-direction: column; width: 100%; flex: 0 0 auto; min-height: 100%; }
+  .track.centered { justify-content: center; }
+  .list-hint {
+    display: none; flex: 0 0 auto; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: #5c5c68;
+    padding: 6px 2px 7px; border-bottom: 1px solid var(--line);
+  }
+  .list-hint b { color: #9a9aa6; font-weight: 500; }
+
+  .row {
+    display: flex; align-items: center; gap: 1.6vw;
+    height: var(--row-h); padding: 0 1.4vw 0 1.2vw;
+    border-left: 4px solid transparent; position: relative;
+    transition: background .5s, border-color .5s;
+  }
+  .row + .row::before {
+    content: ""; position: absolute; top: 0; left: 1.2vw; right: 1.4vw; height: 1px;
+    background: rgba(255, 255, 255, .055);
+  }
+  .idx {
+    font-family: var(--mono); font-size: var(--idx-fs); color: #3a3a3a;
+    flex: 0 0 auto; width: 2.4vw; letter-spacing: .05em; padding-bottom: .4vh;
+  }
+  .main { flex: 1 1 auto; min-width: 0; }
+  .name {
+    font-size: var(--name-fs); font-weight: 600; line-height: 1.16; color: #cfcfcf;
+    letter-spacing: .005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sub {
+    margin-top: .9vh; font-size: var(--sub-fs); color: #8a8a8a;
+    letter-spacing: .02em; font-family: var(--mono);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .side { flex: 0 0 auto; display: flex; align-items: center; gap: 1.4vw; }
+  .price { font-family: var(--mono); font-size: var(--badge-fs); color: #777; letter-spacing: .02em; }
+
+  .badge {
+    font-family: var(--mono); font-size: var(--badge-fs); letter-spacing: .1em;
+    padding: .9vh 1vw; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .13);
+    color: #737373; min-width: 8.6vw; text-align: center; line-height: 1.25;
+  }
+  .badge small {
+    display: block; font-size: calc(var(--badge-fs) * .68); letter-spacing: .06em;
+    opacity: .72; margin-top: .25vh;
+  }
+
+  .row.hot {
+    background: linear-gradient(90deg, rgba(255, 46, 99, .22), rgba(255, 46, 99, .04) 52%, transparent);
+    border-left-color: var(--live);
+    animation: hotglow 2.6s ease-in-out infinite;
+  }
+  @keyframes hotglow {
+    0%, 100% { box-shadow: inset 0 0 50px rgba(255, 46, 99, .06); }
+    50% { box-shadow: inset 0 0 70px rgba(255, 46, 99, .15); }
+  }
+  .row.hot .name { color: #fff; text-shadow: 0 0 32px rgba(255, 46, 99, .4); }
+  .row.hot .sub { color: #cf8fa2; }
+  .row.hot .idx { color: var(--live); }
+  .row.hot .badge {
+    color: #fff; background: var(--live); border-color: var(--live);
+    box-shadow: 0 0 30px rgba(255, 46, 99, .55); animation: badgepulse 1.8s ease-in-out infinite;
+  }
+  @keyframes badgepulse { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.4) } }
+  .row.hot .badge small { color: rgba(255, 255, 255, .95); }
+
+  .row.new-hot::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, rgba(255, 46, 99, .55), transparent 72%);
+    animation: sweep 1.2s ease-out forwards;
+  }
+  @keyframes sweep { 0% { opacity: .95; transform: translateX(-25%) } 100% { opacity: 0; transform: none } }
+
+  /* 项目分组头：与票档行等高，桌面轮播 translateY 分页才精确 */
+  .row.group-head {
+    background: linear-gradient(90deg, var(--gc-bg, rgba(255, 255, 255, .05)), rgba(255, 255, 255, .02) 58%, transparent);
+    border-left-color: var(--gc, var(--accent));
+    border-top: 1px solid var(--gc-dim, rgba(255, 255, 255, .13));
+  }
+  .row.group-head::before { display: none; }
+  .row.group-head .g-idx {
+    width: 2.4vw; height: 3px; border-radius: 2px; flex: 0 0 auto;
+    background: var(--gc, var(--accent)); box-shadow: 0 0 12px var(--gc, var(--accent));
+  }
+  .row.group-head .name { color: #e8e8f0; }
+  .row.group-head .sub { color: #82828f; }
+  .row.group-head .g-count {
+    font-family: var(--mono); font-size: var(--badge-fs); color: #a6a6b4;
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: .7vh 1vw; white-space: nowrap; letter-spacing: .06em;
+  }
+  .row.tk-row { border-left-color: var(--gc-dim, transparent); }
+  .row.tk-row.hot { border-left-color: var(--live); }
+
+  .row.presale .badge { color: #c2a163; border-color: rgba(255, 176, 32, .3); }
+  .row.error .badge { color: #a05a63; border-color: rgba(255, 46, 99, .2); }
+
+  .empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 100%; gap: 1.6vh; color: #333;
+  }
+  .empty .big { font-size: 3.4vh; letter-spacing: .28em; color: #3d3d3d; }
+  .empty .small { font-family: var(--mono); font-size: 1.4vh; letter-spacing: .22em; }
+
+  /* ---------- 视图切换 ---------- */
+  .viewchip {
+    display: inline-flex; align-items: center; gap: .4vw;
+    font-family: var(--mono); font-size: 1.15vh; letter-spacing: .16em;
+    color: #4a4a4a; border: 1px solid var(--line); border-radius: 4px;
+    padding: .45vh .55vw; background: transparent; cursor: pointer;
+    transition: color .25s, border-color .25s;
+  }
+  .viewchip:hover { color: #a8a8b4; border-color: rgba(255, 255, 255, .22); }
+  .viewchip b { font-weight: 600; color: #8f8f9c; letter-spacing: .1em; }
+  .viewchip:hover b { color: #fff; }
+
+  .viewtoast {
+    position: fixed; left: 50%; top: 8vh; z-index: 120; pointer-events: none;
+    transform: translateX(-50%);
+    font-family: var(--mono); font-size: 1.3vh; letter-spacing: .3em;
+    color: #c8c8d4; background: rgba(0, 0, 0, .62);
+    border: 1px solid rgba(255, 255, 255, .14); border-radius: 4px;
+    padding: .8vh 1.2vw; backdrop-filter: blur(6px);
+    animation: toastIn 1.15s ease-out forwards;
+  }
+  @keyframes toastIn {
+    0% { opacity: 0; transform: translate(-50%, -8px) }
+    14% { opacity: 1; transform: translate(-50%, 0) }
+    68% { opacity: 1 }
+    100% { opacity: 0 }
+  }
+
+  .cd-empty { display: none; flex-direction: column; align-items: center; gap: 1.5vh; }
+  .cd-empty .big { font-size: 3.4vh; letter-spacing: .28em; color: #4a4a4a; }
+  .cd-empty .small { font-family: var(--mono); font-size: 1.35vh; letter-spacing: .22em; color: #363636; }
+  body.cd-blank .cd-head,
+  body.cd-blank .cd-clock,
+  body.cd-blank .cd-target { display: none; }
+  body.cd-blank .cd-empty { display: flex; }
+
+  .screen::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+    opacity: 0; transition: opacity .7s ease-out;
+  }
+  .screen.alarm::after {
+    opacity: 1; transition: opacity .06s ease-in;
+    box-shadow: inset 0 0 0 8px var(--live), inset 0 0 170px rgba(255, 46, 99, .38);
+  }
+
+  body.mode-cd .viewport { display: none; }
+  body.mode-list .cd { display: none; }
+
+  @media (max-aspect-ratio: 1/1) {
+    :root { --dh: 13vw; --dw: 9.2vw; --df: 8vw; }
+    .cd-clock { gap: .5vw; padding: 2vh 1vw; }
+    .cd-clock::before { display: none; }
+    .cd-name { font-size: 2.4vh; max-width: 88vw; }
+    .cd-sub { font-size: 1.5vh; }
+    .unit-label { font-size: 10px; letter-spacing: .18em; }
+    .colon { gap: 1.6vh; padding: 0 .2vw; }
+    .colon i { width: 6px; height: 6px; }
+    .cd-head { font-size: 1.4vh; letter-spacing: .2em; }
+    .cd { gap: 2.2vh; }
+    .cdbar { font-size: 1.15vh; padding: .6vh .8vw; gap: .6vw; }
+    .cdbar b { font-size: 1.35vh; }
+    .cdbar .nm { max-width: 38vw; }
+  }
+
+  /* ---------- 手机端：余票改为可上下滑动的列表 ---------- */
+  @media (max-width: 700px) {
+    .screen { padding: 1.6vh 3.5vw 1.4vh; gap: .9vh; }
+    header { flex-wrap: wrap; gap: .7vh 2vw; padding-bottom: 1vh; }
+    .brand { width: 100%; gap: 2.4vw; }
+    h1 { font-size: 2.6vh; max-width: 72vw; }
+    .tag { display: none; }
+    .meta { width: 100%; justify-content: space-between; gap: 1.5vw; flex-wrap: nowrap; }
+    .phase { font-size: 10.5px; padding: 4px 6px; letter-spacing: .02em; }
+    .stat { font-size: 10.5px; }
+    .stat b { font-size: 12px; }
+    .clock-now { font-size: 13px; }
+    .viewchip { font-size: 11px; letter-spacing: .06em; padding: 5px 8px; }
+
+    /* 列表可滚动：禁止轮播 transform，行高由内容决定 */
+    .viewport {
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+      touch-action: pan-y;
+      scrollbar-width: thin; scrollbar-color: #333 transparent;
+    }
+    .viewport::-webkit-scrollbar { width: 4px; }
+    .viewport::-webkit-scrollbar-thumb { background: #2c2c36; border-radius: 4px; }
+    .track { min-height: 0; transform: none !important; }
+    .track.centered { justify-content: flex-start; }
+    body.mode-list .list-hint { display: flex; }
+
+    .row {
+      height: auto; min-height: 88px; padding: 12px 10px;
+      gap: 9px; align-items: center;
+    }
+    .row + .row::before { left: 10px; right: 10px; }
+    .idx { width: 18px; font-size: 10px; padding: 0; align-self: flex-start; padding-top: 3px; }
+    .row .name {
+      font-size: clamp(15px, 4.1vw, 18px) !important;
+      line-height: 1.3; white-space: normal; word-break: break-word;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      max-height: 2.6em;
+    }
+    .row .sub {
+      font-size: 11px !important; margin-top: 5px; line-height: 1.35;
+      white-space: normal; overflow: visible; text-overflow: clip;
+      word-break: break-word;
+    }
+    .side { flex-direction: column; align-items: flex-end; gap: 3px; }
+    .price { display: none; }
+    .badge { min-width: 62px; font-size: 12px !important; padding: 5px 8px; line-height: 1.2; }
+    .badge small { font-size: 9px; margin-top: 2px; }
+    .row.group-head { min-height: 56px; }
+    .row.group-head .g-idx { width: 18px; height: 3px; }
+    .row.group-head .name { font-size: 14px !important; }
+    .row.group-head .sub { font-size: 10.5px !important; }
+    .row.group-head .g-count { font-size: 10px; padding: 4px 7px; }
+    .empty { min-height: 100%; }
+
+    /* 倒计时小屏 */
+    .cd { gap: 1.5vh; }
+    .cd-head { font-size: 12px; letter-spacing: .2em; }
+    .cd-clock { padding: 2vh 0; gap: .8vw; }
+    .cd-name { font-size: 2.2vh; max-width: 90vw; }
+    .cd-sub { font-size: 12px; }
+    .cd-empty .big { font-size: 2.4vh; }
+    .cdbar { font-size: 11px; }
+    .viewtoast { top: 13vh; font-size: 11px; letter-spacing: .18em; }
+  }
+</style>
+</head>
+<body class="mode-cd">
+<div class="screen">
+  <header>
+    <div class="brand">
+      <span class="pulse"></span>
+      <h1 id="title">余票监控</h1>
+      <span class="tag" id="subtitle">LIVE MONITOR</span>
+    </div>
+    <div class="meta">
+      <span class="phase" id="phase"><i></i><span>待机</span></span>
+      <span class="stat"><span class="state-dot" id="sd"></span><span id="statText">连接中</span> <b id="statNum">0 / 0</b><span style="color:#4a4a4a">有票</span></span>
+      <span class="clock-now" id="clock">--:--:--</span>
+      <button class="viewchip" id="viewChip" title="按 Tab / 空格 / 1 / 2 切换">视图 <b id="viewName">倒计时</b></button>
+    </div>
+  </header>
+
+  <section class="cd" id="cd">
+    <div class="cd-head"><span class="dot-live"></span><span>距离开售</span></div>
+    <div class="cd-clock" id="flipClock"></div>
+    <div class="cd-target">
+      <div class="cd-name" id="cdName">—</div>
+      <div class="cd-sub" id="cdSub"></div>
+    </div>
+    <div class="cd-empty">
+      <div class="big">暂无待开售场次</div>
+      <div class="small">NO UPCOMING SALE</div>
+    </div>
+  </section>
+
+  <div class="cdbar" id="cdbar">
+    <span class="k">NEXT SALE</span><b id="barTime">--</b>
+    <span class="nm" id="barName"></span>
+  </div>
+
+  <div class="list-hint" id="listHint"><span>余票列表 · <b id="hintCount">0</b> 项</span><span>上下滑动查看 ↓</span></div>
+
+  <div class="viewport" id="viewport">
+    <div class="track centered" id="track"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var nodes = {};
+  var carouselTimer = null;
+  var carouselIndex = 0;
+  var lastCarouselCount = -1;
+  var lastPer = 0;
+  var lastRowH = 0;
+  var soundOn = false;
+  var audioCtx = null;
+  var viewLock = false;      // 手动切换后暂停自动视图切换
+  var lastAlertAt = 0;
+  var esRef = null;          // 当前唯一的 EventSource，防止重连叠加
+  var reconnectTimer = null;
+  var resizeTimer = null;
+
+  function isMobile() { return window.matchMedia('(max-width: 700px)').matches; }
+
+  /* 刷新 / bfcache 恢复 / 渲染异常时，把易失的 DOM 缓存与计时器全部复位 */
+  function resetUi() {
+    if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+    carouselIndex = 0;
+    lastCarouselCount = -1;
+    lastPer = 0;
+    lastRowH = 0;
+    needFit = false;
+    nodes = {};
+    track.innerHTML = '';
+    track.style.transform = '';
+    track.classList.add('centered');
+    CD.active = false;
+    CD.opened = false;
+    CD.lastTotal = -1;
+    CD.saleAt = 0;
+    Object.keys(units).forEach(function (k) {
+      var d = units[k];
+      d.classList.remove('flip');
+      clearTimeout(d._t);
+      d.dataset.v = '0';
+      d.querySelectorAll('span').forEach(function (s) { s.textContent = '0'; });
+    });
+    var old = document.querySelector('.viewtoast');
+    if (old) old.remove();
+  }
+
+  var SC = new URLSearchParams(location.search).get('sharecode') || '';
+  function withSC(u) {
+    if (!SC) return u;
+    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + encodeURIComponent(SC);
+  }
+
+  var track = document.getElementById('track');
+  var viewport = document.getElementById('viewport');
+  var cdEl = document.getElementById('cd');
+
+  var CD = { active: false, saleAt: 0, offset: 0, lastTotal: -1, opened: false, name: '', sub: '' };
+  var units = {};
+
+  /* ---------------- 视图切换 ---------------- */
+
+  function currentView() {
+    return document.body.classList.contains('mode-list') ? 'list' : 'cd';
+  }
+
+  function applyView(v, silent) {
+    var isCd = v === 'cd';
+    document.body.classList.toggle('mode-cd', isCd);
+    document.body.classList.toggle('mode-list', !isCd);
+    document.getElementById('viewName').textContent = isCd ? '倒计时' : '余票';
+    syncBlank();
+    if (!isCd) {
+      layout(Object.keys(nodes).length);
+      requestAnimationFrame(function () { layout(Object.keys(nodes).length); fitAll(); });
+    } else {
+      CD.lastTotal = -1;
+      tickCountdown();
+    }
+    if (!silent) showToast(isCd ? '开票倒计时' : '余票监控');
+  }
+
+  function setView(v) {
+    viewLock = true;
+    applyView(v);
+  }
+
+  function toggleView() {
+    setView(currentView() === 'cd' ? 'list' : 'cd');
+  }
+
+  // 倒计时视图但没有待开售场次时，显示占位而非一排 0
+  function syncBlank() {
+    var blank = currentView() === 'cd' && !CD.active;
+    document.body.classList.toggle('cd-blank', blank);
+  }
+
+  var toastTimer = null;
+  function showToast(text) {
+    var old = document.querySelector('.viewtoast');
+    if (old) old.remove();
+    var el = document.createElement('div');
+    el.className = 'viewtoast';
+    el.textContent = text;
+    document.body.appendChild(el);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.remove(); }, 1200);
+  }
+
+  var keyBinds = {
+    Tab: 'toggle', ' ': 'toggle', Spacebar: 'toggle',
+    '1': 'cd', '2': 'list', c: 'cd', C: 'cd', l: 'list', L: 'list',
+    ArrowLeft: 'cd', ArrowRight: 'list', ArrowUp: 'cd', ArrowDown: 'list'
+  };
+
+  window.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    var act = keyBinds[e.key];
+    if (!act) return;
+    e.preventDefault();
+    if (act === 'toggle') toggleView();
+    else setView(act);
+  });
+
+  document.getElementById('viewChip').addEventListener('click', function (e) {
+    e.preventDefault();
+    toggleView();
+  });
+
+  /* ---------------- 翻页时钟 ---------------- */
+
+  function buildClock() {
+    var html = '';
+    var defs = [
+      { k: 'd', label: 'DAYS', show: false },
+      { k: 'h', label: 'HOURS', show: true },
+      { k: 'm', label: 'MINS', show: true },
+      { k: 's', label: 'SECS', show: true },
+    ];
+    defs.forEach(function (u, i) {
+      if (i > 0) html += '<div class="colon" data-colon="' + i + '"><i></i><i></i></div>';
+      html += '<div class="unit" data-unit="' + u.k + '">' +
+        '<div class="digits">' +
+        '<div class="digit" data-k="' + u.k + '0"></div>' +
+        '<div class="digit" data-k="' + u.k + '1"></div>' +
+        '</div><div class="unit-label">' + u.label + '</div></div>';
+    });
+    var el = document.getElementById('flipClock');
+    el.innerHTML = html;
+
+    el.querySelectorAll('.digit').forEach(function (d) {
+      d.innerHTML =
+        '<div class="half top"><span>0</span></div>' +
+        '<div class="half bottom"><span>0</span></div>' +
+        '<div class="flip-layer flip-top"><span>0</span></div>' +
+        '<div class="flip-layer flip-bottom"><span>0</span></div>';
+      d.dataset.v = '0';
+      units[d.dataset.k] = d;
+    });
+  }
+
+  function setDigit(el, val) {
+    var v = String(val);
+    if (el.dataset.v === v) return;
+    var prev = el.dataset.v;
+    el.dataset.v = v;
+    el.querySelector('.half.top span').textContent = v;
+    el.querySelector('.half.bottom span').textContent = prev;
+    el.querySelector('.flip-top span').textContent = prev;
+    el.querySelector('.flip-bottom span').textContent = v;
+    el.classList.remove('flip');
+    void el.offsetWidth;
+    el.classList.add('flip');
+    clearTimeout(el._t);
+    el._t = setTimeout(function () {
+      el.querySelector('.half.bottom span').textContent = v;
+    }, 268);
+  }
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function updateBar(remain) {
+    var b = document.getElementById('cdbar');
+    if (!b.classList.contains('show')) return;
+    var el = document.getElementById('barTime');
+    if (remain <= 0) { el.textContent = '正在开售'; return; }
+    var t = Math.floor(remain / 1000);
+    if (el.dataset.t === String(t)) return;
+    el.dataset.t = String(t);
+    var d = Math.floor(t / 86400), h = Math.floor((t % 86400) / 3600);
+    var m = Math.floor((t % 3600) / 60), sec = t % 60;
+    el.textContent = (d > 0 ? d + '天 ' : '') + pad2(h) + ':' + pad2(m) + ':' + pad2(sec);
+  }
+
+  function tickCountdown() {
+    if (!CD.active) return;
+    var now = Date.now() + CD.offset;
+    var remain = CD.saleAt * 1000 - now;
+    updateBar(remain);
+    if (document.body.classList.contains('mode-list')) return;
+    if (remain <= 0) {
+      if (!CD.opened) onOpen();
+      return;
+    }
+    var total = Math.floor(remain / 1000);
+    if (total === CD.lastTotal) return;
+    CD.lastTotal = total;
+
+    var d = Math.floor(total / 86400);
+    var h = Math.floor((total % 86400) / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+
+    var dUnit = document.querySelector('[data-unit="d"]');
+    if (d > 0) {
+      dUnit.style.display = '';
+      document.querySelectorAll('[data-colon="1"]')[0].style.display = '';
+      setDigit(units.d0, Math.floor(d / 10));
+      setDigit(units.d1, d % 10);
+    } else {
+      dUnit.style.display = 'none';
+      document.querySelectorAll('[data-colon="1"]')[0].style.display = 'none';
+    }
+
+    setDigit(units.h0, Math.floor(h / 10));
+    setDigit(units.h1, h % 10);
+    setDigit(units.m0, Math.floor(m / 10));
+    setDigit(units.m1, m % 10);
+    setDigit(units.s0, Math.floor(s / 10));
+    setDigit(units.s1, s % 10);
+
+    cdEl.classList.toggle('urgent', total <= 60);
+
+    // 冒号闪烁
+    document.querySelectorAll('.colon').forEach(function (c, i) {
+      if (i === 0) return;
+      c.classList.toggle('dim', s % 2 === 1);
+    });
+  }
+
+  function onOpen() {
+    CD.opened = true;
+    setDigit(units.h0, 0); setDigit(units.h1, 0);
+    setDigit(units.m0, 0); setDigit(units.m1, 0);
+    setDigit(units.s0, 0); setDigit(units.s1, 0);
+    burst();
+    flash();
+    beep();
+    setTimeout(function () {
+      if (!CD.active) return;
+      // 开售必须看到余票列表，手动锁定在此刻失效
+      viewLock = false;
+      applyView('list', true);
+    }, 900);
+  }
+
+  function burst() {
+    var b = document.createElement('div');
+    b.className = 'burst';
+    b.innerHTML = '<span>开 售</span>';
+    document.body.appendChild(b);
+    setTimeout(function () { b.remove(); }, 1600);
+  }
+
+  /* ---------------- 列表 ---------------- */
+
+  function tickClock() {
+    var d = new Date();
+    document.getElementById('clock').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+  setInterval(tickClock, 1000); tickClock();
+
+  function money(fen) {
+    if (!fen) return '';
+    return '¥' + (fen / 100).toFixed(fen % 100 === 0 ? 0 : 2);
+  }
+
+  function badgeHtml(t) {
+    if (t.status === 'available') {
+      var n = t.num, lim = t.limit;
+      // num 被每单限购数封顶，只有小于限购数时才代表真实剩余
+      var extra = (n !== null && n !== undefined && lim && n > 0 && n < lim)
+        ? '仅剩 ' + n + ' 张'
+        : 'AVAILABLE';
+      return '<span class="badge">有票<small>' + extra + '</small></span>';
+    }
+    var label = t.status === 'soldout' ? '无票' : (t.label || '待检测');
+    var sub = t.status === 'soldout' ? 'SOLD OUT' : (t.status === 'presale' ? 'STANDBY' : (t.status === 'error' ? 'ERROR' : '—'));
+    return '<span class="badge">' + escHtml(label) + '<small>' + escHtml(sub) + '</small></span>';
+  }
+
+  function render(next) {
+    document.getElementById('title').textContent = next.title || '余票监控';
+    var sub = document.getElementById('subtitle');
+    sub.textContent = next.subtitle || 'LIVE MONITOR';
+    sub.style.display = next.subtitle ? '' : 'none';
+
+    document.getElementById('statNum').textContent = next.stats.available + ' / ' + next.stats.total;
+    document.getElementById('statText').textContent = next.running ? '监控中' : '已暂停';
+    document.getElementById('sd').className = 'state-dot' + (next.running ? '' : ' off');
+    soundOn = !!next.sound;
+
+    renderPhase(next.engine);
+    var hasAvail = (next.targets || []).some(function (t) { return t.available; });
+    renderCountdown(next.countdown, hasAvail);
+    renderList(next.targets || []);
+  }
+
+  function renderPhase(engine) {
+    var el = document.getElementById('phase');
+    if (!el || !engine) return;
+    var ph = engine.phase || '';
+    var cls = 'phase' + (ph && ph !== 'idle' && ph !== 'off' ? ' ' + ph : '');
+    el.className = cls;
+    var ms = engine.interval || 0;
+    var txt;
+    if (ph === 'idle') {
+      // 开售前静默：不发请求，只等开售前 N 秒启动
+      txt = engine.phaseLabel || '静默待开售';
+    } else if (ph === 'blocked') {
+      var left = (engine.risk && engine.risk.remaining) || 0;
+      txt = '风控冷却 · ' + (left > 0 ? left + 's' : '等待解封');
+    } else if (ph === 'yield') {
+      var av = engine.avoidance || {};
+      txt = '开售避让 · ' + (av.remaining > 0 ? av.remaining + 's 后开售' : '让路中');
+    } else if (ph === 'off' || !ph) {
+      txt = '待机';
+    } else if (ms > 0) {
+      var rate = ms >= 1000 ? (ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1) + 's' : ms + 'ms';
+      txt = (engine.phaseLabel || '待机') + ' · ' + rate;
+    } else {
+      txt = engine.phaseLabel || '待机';
+    }
+    el.querySelector('span').textContent = txt;
+  }
+
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function renderCountdown(cd, hasAvail) {
+    if (!cd) return;
+    var bar = document.getElementById('cdbar');
+    if (!cd.active) {
+      CD.active = false;
+      CD.saleAt = 0;
+      bar.classList.remove('show');
+      syncBlank();
+      if (!viewLock && currentView() === 'cd') applyView('list', true);
+      return;
+    }
+    // 有票时用小条提示下一个开售场次，不遮挡列表
+    if (hasAvail) {
+      bar.classList.add('show');
+      document.getElementById('barName').textContent = cd.name || '';
+      if (!CD.opened && !viewLock && currentView() === 'cd') applyView('list', true);
+    } else {
+      bar.classList.remove('show');
+    }
+
+    // 先在覆盖前保存，否则「开售场次切换」永远检测不到（原逻辑的自我比较 bug）
+    var prevSaleAt = CD.saleAt;
+    CD.offset = (cd.serverNow || Date.now()) - Date.now();
+    CD.saleAt = cd.saleAt;
+    CD.name = cd.name;
+    CD.sub = [cd.screen, cd.ticket].filter(Boolean).join('   ·   ');
+
+    // 每帧都刷新文案，不依赖「首次」分支，刷新后不会出现空白标题
+    document.getElementById('cdName').textContent = cd.name || '';
+    document.getElementById('cdSub').innerHTML =
+      '开售时间 <b>' + escHtml(cd.saleText || '—') + '</b>' +
+      (cd.ticket ? '　·　' + escHtml(cd.ticket) : '');
+
+    if (!CD.active) {
+      CD.active = true;
+      CD.opened = false;
+      CD.lastTotal = -1;
+      syncBlank();
+      if (!viewLock && !hasAvail) applyView('cd', true);
+      tickCountdown();
+    } else if (prevSaleAt !== cd.saleAt) {
+      // 上一场开售时间已过、切到下一场：重置爆发与翻页基线
+      CD.opened = false;
+      CD.lastTotal = -1;
+      tickCountdown();
+    }
+  }
+
+  var needFit = false;
+
+  var GROUP_COLORS = ['#fb7299', '#ffb020', '#4aa3ff', '#35d07f', '#b07cff', '#ff7a5c', '#37cfd0', '#e05fa8'];
+
+  // 按项目 ID 分组：组间「有票优先 / 最近变化优先」，组内同样有票优先
+  function groupTargets(targets) {
+    var map = new Map();
+    targets.forEach(function (t) {
+      var pid = t.projectId || ('_' + t.id);
+      if (!map.has(pid)) map.set(pid, { pid: pid, name: t.projectName || t.name, items: [] });
+      map.get(pid).items.push(t);
+    });
+    var groups = Array.from(map.values());
+    groups.forEach(function (g) {
+      g.items.sort(function (a, b) {
+        if (a.available !== b.available) return a.available ? -1 : 1;
+        return (b.available ? b.changedAt : b.checkedAt) - (a.available ? a.changedAt : a.checkedAt);
+      });
+    });
+    var lastOf = function (g) {
+      return Math.max.apply(null, g.items.map(function (x) {
+        return (x.available ? x.changedAt : x.checkedAt) || 0;
+      }).concat([0]));
+    };
+    groups.sort(function (a, b) {
+      var aa = a.items.some(function (x) { return x.available; });
+      var bb = b.items.some(function (x) { return x.available; });
+      if (aa !== bb) return aa ? -1 : 1;
+      return lastOf(b) - lastOf(a);
+    });
+    return groups;
+  }
+
+  function renderList(targets) {
+    var groups = groupTargets(targets);
+    // 展平成「单元」序列：分组头 + 票档行，二者等高，桌面轮播分页不受影响
+    var cells = [];
+    groups.forEach(function (g, gi) {
+      cells.push({ key: 'g_' + g.pid, kind: 'group', g: g, gi: gi });
+      g.items.forEach(function (t) {
+        cells.push({ key: 't_' + t.id, kind: 'row', t: t, gi: gi });
+      });
+    });
+
+    // 刷新 / bfcache 恢复后 DOM 可能已被清空而缓存还在，先剔除失效引用
+    Object.keys(nodes).forEach(function (id) {
+      var el = nodes[id];
+      if (!el || !el.isConnected || el.parentNode !== track) delete nodes[id];
+    });
+
+    var alive = {};
+    var rowNo = 0;
+    cells.forEach(function (u, i) {
+      alive[u.key] = true;
+      var el = nodes[u.key];
+      if (!el) {
+        el = document.createElement('div');
+        if (u.kind === 'group') {
+          el.className = 'row group-head';
+          el.innerHTML = '<span class="g-idx"></span>' +
+            '<div class="main"><div class="name"></div><div class="sub"></div></div>' +
+            '<div class="side"><span class="g-count"></span></div>';
+        } else {
+          el.className = 'row tk-row';
+          el.innerHTML = '<span class="idx"></span>' +
+            '<div class="main"><div class="name"></div><div class="sub"></div></div>' +
+            '<div class="side"><span class="price"></span>' + badgeHtml(u.t) + '</div>';
+        }
+        nodes[u.key] = el;
+      }
+      // 组色：分组头用实色，同组票档行用淡色左边条，视觉上区分不同项目
+      var color = GROUP_COLORS[u.gi % GROUP_COLORS.length];
+      el.style.setProperty('--gc', color);
+      el.style.setProperty('--gc-dim', color + '4d');
+      el.style.setProperty('--gc-bg', color + '22');
+
+      var at = track.children[i];
+      if (at !== el) track.insertBefore(el, at || null);
+
+      if (u.kind === 'group') {
+        var g = u.g;
+        var av = g.items.filter(function (x) { return x.available; }).length;
+        if (el.dataset.nm !== g.name) {
+          el.querySelector('.name').textContent = g.name;
+          el.dataset.nm = g.name;
+          needFit = true;
+        }
+        el.querySelector('.sub').textContent = 'ID ' + g.pid + '   ·   ' + g.items.length + ' 个票档' + (av ? '   ·   有票 ' + av : '');
+        el.querySelector('.g-count').textContent = g.items.length + ' 档';
+        return;
+      }
+
+      // 票档行
+      rowNo += 1;
+      var t = u.t;
+      el.querySelector('.idx').textContent = pad2(rowNo);
+      // 分组后项目名由组头统一承载，行内突出票档名（观众最关心「哪个档有票」）
+      var nm = t.ticket || t.name;
+      if (el.dataset.nm !== nm) {
+        el.querySelector('.name').textContent = nm;
+        el.dataset.nm = nm;
+        needFit = true;
+      }
+      el.querySelector('.sub').textContent = t.screen || '';
+      el.querySelector('.price').textContent = money(t.price);
+
+      var key = t.status + '|' + t.stock + '|' + t.stale;
+      if (el.dataset.key !== key) {
+        var old = el.querySelector('.badge');
+        var tmp = document.createElement('div');
+        tmp.innerHTML = badgeHtml(t);
+        var fresh = tmp.firstChild;
+        if (old) old.replaceWith(fresh);
+        else el.querySelector('.side').appendChild(fresh);
+        el.dataset.key = key;
+      }
+
+      el.classList.toggle('hot', !!t.available);
+      el.classList.toggle('presale', t.status === 'presale');
+      el.classList.toggle('error', t.status === 'error');
+      if (t.available && el.dataset.hot === '0') {
+        el.classList.add('new-hot');
+        setTimeout(function () { el.classList.remove('new-hot'); }, 1300);
+      }
+      el.dataset.hot = t.available ? '1' : '0';
+    });
+
+    Object.keys(nodes).forEach(function (id) {
+      if (!alive[id]) { nodes[id].remove(); delete nodes[id]; }
+    });
+
+    var emptyEl = track.querySelector('.empty');
+    if (!targets.length) {
+      Object.keys(nodes).forEach(function (id) { nodes[id].remove(); });
+      nodes = {};
+      if (!emptyEl) {
+        track.innerHTML = '<div class="empty"><div class="big">暂无监控项目</div><div class="small">WAITING FOR TARGETS</div></div>';
+      }
+    } else if (emptyEl) {
+      emptyEl.remove();
+    }
+
+    var hint = document.getElementById('hintCount');
+    if (hint) hint.textContent = String(targets.length);
+
+    layout(cells.length);
+    if (needFit) {
+      needFit = false;
+      setTimeout(function () {
+        layout(Object.keys(nodes).length);
+        fitAll();
+      }, 30);
+    }
+  }
+
+  function fitAll() {
+    var ids = Object.keys(nodes);
+    if (isMobile()) {
+      // 手机端字号由 CSS 控制，清掉桌面端遗留的内联缩放
+      ids.forEach(function (id) {
+        var n = nodes[id].querySelector('.name');
+        if (n) n.style.fontSize = '';
+      });
+      return;
+    }
+    if (!ids.length) return;
+    var base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--name-fs')) || 40;
+    var ratio = 1;
+    ids.forEach(function (id) {
+      var n = nodes[id].querySelector('.name');
+      if (!n) return;
+      n.style.fontSize = '';
+      var avail = n.clientWidth;
+      if (avail && n.scrollWidth > avail + 1) {
+        ratio = Math.min(ratio, (avail / n.scrollWidth) * 0.975);
+      }
+    });
+    var fs = Math.max(Math.round(base * 0.42), Math.floor(base * ratio));
+    ids.forEach(function (id) {
+      var n = nodes[id].querySelector('.name');
+      if (n) n.style.fontSize = fs + 'px';
+    });
+  }
+
+  function stopCarousel() {
+    if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+    carouselIndex = 0;
+    lastCarouselCount = -1;
+    lastPer = 0;
+    track.style.transform = '';
+    track.classList.remove('centered');
+  }
+
+  function layout(count) {
+    // 手机端完全交给原生滚动，不设固定行高、不启动轮播
+    if (isMobile()) { stopCarousel(); return; }
+    var h = viewport.clientHeight;
+    if (!h) return;
+    var visible = Math.min(Math.max(count, 2), 6);
+    var rowH = Math.round(Math.min(280, Math.max(84, h / visible)));
+    if (Math.abs(rowH - lastRowH) > 2) {
+      lastRowH = rowH;
+      needFit = true;
+      Object.keys(nodes).forEach(function (id) {
+        var n = nodes[id].querySelector('.name');
+        if (n) n.style.fontSize = '';
+      });
+      var root = document.documentElement.style;
+      root.setProperty('--row-h', rowH + 'px');
+      root.setProperty('--name-fs', Math.round(rowH * 0.30) + 'px');
+      root.setProperty('--sub-fs', Math.round(rowH * 0.125) + 'px');
+      root.setProperty('--badge-fs', Math.round(rowH * 0.115) + 'px');
+      root.setProperty('--idx-fs', Math.round(rowH * 0.095) + 'px');
+    }
+
+    var per = Math.max(1, Math.floor(h / rowH));
+    var needCarousel = count > per;
+    track.classList.toggle('centered', !needCarousel);
+    // 尺寸每帧都算，轮播只在分页结构变化时重建（刷新/窗口变化也能纠正）
+    if (count === lastCarouselCount && per === lastPer) return;
+    lastCarouselCount = count;
+    lastPer = per;
+    if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+    carouselIndex = 0;
+    track.style.transform = 'translateY(0)';
+    if (needCarousel) {
+      carouselTimer = setInterval(function () {
+        var max = Math.ceil(count / per) - 1;
+        carouselIndex = carouselIndex >= max ? 0 : carouselIndex + 1;
+        track.style.transform = 'translateY(' + (-carouselIndex * per * rowH) + 'px)';
+      }, 7000);
+    }
+  }
+
+  /* ---------------- 提示 ---------------- */
+
+  // 日志面板已移除，仅保留到货时的闪屏与提示音
+  function handleLog(entry) {
+    if (!entry || entry.level !== 'alert') return;
+    var now = Date.now();
+    if (now - lastAlertAt < 1500) return;
+    lastAlertAt = now;
+    flash();
+    beep();
+  }
+
+  function flash() {
+    var sc = document.querySelector('.screen');
+    var on = function () { sc.style.outline = '8px solid #ff2e63'; sc.style.outlineOffset = '-8px'; };
+    var off = function () { sc.style.outline = 'none'; };
+    on();
+    setTimeout(off, 380);
+    setTimeout(on, 560);
+    setTimeout(off, 950);
+  }
+
+  function beep() {
+    if (!soundOn) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      [0, .2].forEach(function (d) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = 880;
+        var t0 = audioCtx.currentTime + d;
+        g.gain.setValueAtTime(.0001, t0);
+        g.gain.exponentialRampToValueAtTime(.2, t0 + .02);
+        g.gain.exponentialRampToValueAtTime(.0001, t0 + .15);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t0); o.stop(t0 + .17);
+      });
+    } catch (e) {}
+  }
+
+  window.addEventListener('pointerdown', function () {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) {}
+  }, { once: true });
+
+  function safeRender(data) {
+    try {
+      render(data);
+    } catch (e) {
+      // 状态不一致时整体复位再渲染一次，避免半坏 UI 一直挂在大屏上
+      console.error('render error, resetting UI', e);
+      resetUi();
+      try { render(data); } catch (e2) { console.error('render retry failed', e2); }
+    }
+  }
+
+  function connect() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (esRef) { try { esRef.close(); } catch (e) {} esRef = null; }
+    var es = new EventSource(withSC('/api/live/stream'));
+    esRef = es;
+    es.addEventListener('state', function (ev) {
+      try { safeRender(JSON.parse(ev.data)); } catch (e) { console.error('state parse', e); }
+    });
+    es.addEventListener('log', function (ev) {
+      try { handleLog(JSON.parse(ev.data)); } catch (e) {}
+    });
+    es.onerror = function () {
+      if (esRef !== es) return;   // 已被替换的旧连接，忽略迟到错误，防止重连叠加
+      try { es.close(); } catch (e) {}
+      esRef = null;
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(function () { reconnectTimer = null; connect(); }, 3000);
+      }
+    };
+  }
+
+  // 窗口尺寸变化：重算行高 / 字号，并切换「桌面轮播 ↔ 手机滚动」
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      lastRowH = 0;
+      layout(Object.keys(nodes).length);
+      fitAll();
+    }, 120);
+  });
+
+  // bfcache 恢复（移动端返回 / 刷新常见）：旧 DOM 与计时器会残留，整体复位重连
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    resetUi();
+    applyView('cd', true);
+    connect();
+  });
+
+  buildClock();
+  applyView('cd', true);
+  setInterval(tickCountdown, 120);
+  connect();
+})();
+</script>
+</body>
+</html>

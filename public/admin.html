@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>余票监控 · 管理台</title>
+<style>
+  :root {
+    --bg: #08080b;
+    --panel: #0f0f14;
+    --panel2: #13131a;
+    --line: rgba(255, 255, 255, 0.075);
+    --text: #e6e6ea;
+    --dim: #7c7c8a;
+    --dim2: #565663;
+    --accent: #fb7299;
+    --red: #ff2e63;
+    --green: #35d07f;
+    --amber: #ffb020;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --sans: "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    font-size: 14px; min-height: 100vh;
+    background-image: radial-gradient(90% 60% at 80% -10%, rgba(251, 114, 153, 0.07), transparent 60%);
+  }
+  a { color: var(--accent); text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, select, textarea {
+    font-family: inherit; font-size: 13px; color: var(--text);
+    background: #15151d; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+    padding: 9px 11px; outline: none; width: 100%;
+    transition: border-color 0.15s;
+  }
+  input:hover, textarea:hover { border-color: rgba(255, 255, 255, 0.2); }
+  input:focus, select:focus, textarea:focus { border-color: rgba(251, 114, 153, 0.55); background: #171720; }
+  ::placeholder { color: var(--dim2); }
+
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 26px 60px; }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between; gap: 20px;
+    padding: 20px 0 18px; border-bottom: 1px solid var(--line); margin-bottom: 22px;
+    position: sticky; top: 0; background: rgba(8, 8, 11, 0.92); backdrop-filter: blur(12px); z-index: 20;
+  }
+  .logo { display: flex; align-items: center; gap: 11px; }
+  .logo .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--red);
+    box-shadow: 0 0 12px var(--red); animation: p 2s infinite;
+  }
+  @keyframes p { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  .logo h1 { font-size: 17px; font-weight: 700; letter-spacing: 0.06em; }
+  .logo span {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.24em; color: var(--dim2);
+    border: 1px solid var(--line); padding: 2px 6px; border-radius: 3px;
+  }
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 15px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    transition: all 0.16s; white-space: nowrap;
+  }
+  .btn:hover { border-color: rgba(255, 255, 255, 0.2); background: #191922; }
+  .btn.primary { background: var(--accent); color: #1a0a10; border-color: var(--accent); font-weight: 600; }
+  .btn.primary:hover { background: #ff85a9; }
+  .btn.danger { color: #ff8fa3; border-color: rgba(255, 46, 99, 0.3); }
+  .btn.danger:hover { background: rgba(255, 46, 99, 0.12); }
+  .btn.stop { background: rgba(255, 46, 99, 0.14); border-color: rgba(255, 46, 99, 0.4); color: #ff8fa3; }
+  .btn.ghost { background: transparent; }
+  .btn.sm { padding: 5px 10px; font-size: 12px; border-radius: 5px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.05em;
+    padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim);
+    background: var(--panel2);
+  }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--dim2); }
+  .pill.on { color: #9ff0c4; border-color: rgba(53, 208, 127, 0.3); }
+  .pill.on i { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .card-h {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 13px 16px; border-bottom: 1px solid var(--line);
+  }
+  .card-h h2 { font-size: 13.5px; font-weight: 600; letter-spacing: 0.04em; }
+  .card-h h2 em { font-style: normal; color: var(--dim2); font-family: var(--mono); font-size: 11px; margin-left: 8px; letter-spacing: 0.1em; }
+  .card-b { padding: 16px; }
+
+  .row-input { display: flex; gap: 9px; }
+  .row-input input { flex: 1 1 auto; }
+
+  .hint { font-size: 12px; color: var(--dim2); margin-top: 9px; line-height: 1.6; }
+  .hint code { font-family: var(--mono); color: var(--dim); background: #16161e; padding: 1px 5px; border-radius: 3px; }
+
+  /* 解析结果 */
+  #resolveBox { display: none; margin-top: 15px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .proj-head { display: flex; gap: 13px; align-items: flex-start; margin-bottom: 13px; }
+  .proj-head img { width: 58px; height: 58px; border-radius: 7px; object-fit: cover; background: #1b1b24; flex: 0 0 auto; }
+  .proj-head .t { font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+  .proj-head .s { font-size: 12px; color: var(--dim); margin-top: 5px; line-height: 1.5; }
+  .screen-block { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 9px; overflow: hidden; }
+  .screen-h {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 12px; background: rgba(255, 255, 255, 0.022); font-size: 12.5px;
+  }
+  .screen-h .n { color: #c9c9d4; font-weight: 500; }
+  .screen-h .d { color: var(--dim2); font-family: var(--mono); font-size: 11px; }
+  .tk {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.045); font-size: 13px; cursor: pointer;
+  }
+  .tk:hover { background: rgba(255, 255, 255, 0.02); }
+  .tk input { width: 15px; height: 15px; accent-color: var(--accent); flex: 0 0 auto; }
+  .tk .nm { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tk .pr { font-family: var(--mono); color: var(--dim); font-size: 12px; }
+  .tag {
+    font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 4px;
+    border: 1px solid var(--line); color: var(--dim); letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .tag.av { color: #ff9db3; border-color: rgba(255, 46, 99, 0.4); background: rgba(255, 46, 99, 0.1); }
+  .tag.so { color: #8a8a95; }
+  .tag.pre { color: #c9a45c; border-color: rgba(255, 176, 32, 0.28); }
+
+  /* 目标表 */
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl th {
+    text-align: left; font-size: 11px; font-weight: 500; color: var(--dim2);
+    letter-spacing: 0.1em; padding: 9px 14px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); text-transform: uppercase;
+  }
+  .tbl td { padding: 12px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.045); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr.hot td { background: rgba(255, 46, 99, 0.055); }
+  /* 项目分组头（按项目 ID 归类） */
+  .tbl tr.group-head td {
+    padding: 0 !important; background: #0c0c12;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .tbl tr.group-head:first-child td { border-top: none; }
+  .gh-inner { display: flex; align-items: center; gap: 10px; padding: 9px 14px; }
+  .gh-bar { width: 4px; height: 18px; border-radius: 2px; flex: 0 0 auto; }
+  .gh-name {
+    font-weight: 600; font-size: 13px; color: #d7d7e0; max-width: 40%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gh-id, .gh-meta { font-family: var(--mono); font-size: 11px; color: var(--dim2); }
+  .gh-sp { flex: 1 1 auto; }
+  .gh-lbl { font-size: 11px; color: var(--dim); white-space: nowrap; }
+  .tbl tr.group-head .sw { flex: 0 0 auto; }
+  .t-name { font-weight: 500; font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
+  .t-name .alias { color: var(--dim2); font-size: 11px; font-family: var(--mono); }
+  .t-sub { font-size: 11.5px; color: var(--dim); margin-top: 4px; font-family: var(--mono); }
+  .t-mono { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  .state-tag {
+    font-family: var(--mono); font-size: 11px; padding: 4px 9px; border-radius: 4px;
+    border: 1px solid var(--line); color: var(--dim); display: inline-block; white-space: nowrap;
+  }
+  .state-tag.av { color: #fff; background: var(--red); border-color: var(--red); font-weight: 600; box-shadow: 0 0 14px rgba(255,46,99,.4); }
+  .state-tag.so { color: #8f8f9b; }
+  .state-tag.pre { color: #c9a45c; border-color: rgba(255, 176, 32, 0.3); }
+  .state-tag.err { color: #ff6b7f; border-color: rgba(255, 46, 99, 0.28); }
+  .ops { display: flex; gap: 6px; justify-content: flex-end; }
+  .sw {
+    width: 34px; height: 19px; border-radius: 999px; background: #26262f; position: relative;
+    cursor: pointer; transition: background 0.16s; flex: 0 0 auto;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #7c7c8a; transition: all 0.16s;
+  }
+  .sw.on { background: rgba(251, 114, 153, 0.28); }
+  .sw.on::after { left: 17px; background: var(--accent); }
+
+  .empty-state { padding: 44px 20px; text-align: center; color: var(--dim2); }
+  .empty-state .b { font-size: 14px; color: var(--dim); margin-bottom: 7px; }
+  .empty-state .s { font-size: 12px; font-family: var(--mono); letter-spacing: 0.06em; }
+
+  /* 设置 */
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 6px; letter-spacing: 0.02em; }
+  .field .desc { font-size: 11px; color: var(--dim2); margin-top: 5px; line-height: 1.55; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mini-label { display: block; font-size: 11px; color: var(--dim2); margin-bottom: 5px; }
+  .ntp-row { display: flex; align-items: center; gap: 8px; }
+  .ntp-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
+    background: #4a4a55; transition: background .2s;
+  }
+  .ntp-dot.on { background: #3ddc97; box-shadow: 0 0 8px rgba(61, 220, 151, .6); }
+  .ntp-text {
+    flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--dim);
+    font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ntp-row .btn { flex: 0 0 auto; padding: 4px 9px; }
+  .ntp-sub {
+    font-size: 10.5px; color: #565664; font-family: var(--mono);
+    margin: 5px 0 0 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b9b9c4; cursor: pointer; margin-bottom: 9px; }
+  .check input { width: 15px; height: 15px; accent-color: var(--accent); }
+
+  /* 412 风控策略 */
+  .risk-box {
+    background: #101018; border: 1px solid rgba(255,255,255,.06);
+    border-radius: 7px; padding: 9px 11px;
+  }
+  .risk-line {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 4px 0; font-family: var(--mono); font-size: 11.5px;
+  }
+  .risk-line + .risk-line { border-top: 1px solid rgba(255,255,255,.045); }
+  .risk-line .rk { color: var(--dim2); letter-spacing: .04em; }
+  .risk-line .rv { color: #b6b6c2; text-align: right; }
+  .risk-line .rv.on { color: #8fe0b4; }
+  .risk-line .rv.off { color: #d3a45e; }
+  .risk-line .rv.hot { color: #ff8fa3; }
+  .short-note {
+    display: none; margin-bottom: 12px; padding: 8px 10px; border-radius: 6px;
+    background: rgba(90,160,255,.07); border: 1px solid rgba(90,160,255,.2);
+    font-family: var(--mono); font-size: 11px; line-height: 1.6; color: #9fc4ee;
+    word-break: break-all;
+  }
+  .short-note code { color: #cfe3ff; }
+
+  /* 日志 */
+  .logs {
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.85;
+    height: 300px; overflow-y: auto; padding: 12px 14px;
+    background: #06060a;
+  }
+  .logs::-webkit-scrollbar { width: 8px; }
+  .logs::-webkit-scrollbar-thumb { background: #23232c; border-radius: 4px; }
+  .ln { display: flex; gap: 8px; align-items: baseline; }
+  .ln .ts { color: #41414c; flex: 0 0 auto; }
+  .ln .tx { color: #8d8d9a; word-break: break-word; line-height: 1.6; }
+  .ln.alert .tx { color: #ff6b8b; font-weight: 600; }
+  .ln.warn .tx { color: #d3a45e; }
+  .ln.error .tx { color: #a85a5a; }
+  .ln.system .tx { color: #5d7a8d; }
+  .ln.info .tx { color: #7f8f7f; }
+
+  /* 访问统计 */
+  .vstat { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .vstat > div { background: #101018; border: 1px solid rgba(255,255,255,.055); border-radius: 6px; padding: 10px 12px; }
+  .vstat b { display: block; font-family: var(--mono); font-size: 25px; font-weight: 600; color: #fff; line-height: 1.25; }
+  .vstat span { font-size: 11px; color: var(--dim2); }
+  .vnote { font-family: var(--mono); font-size: 11px; color: var(--dim2); margin-top: 10px; }
+  .vsep { height: 1px; background: rgba(255,255,255,.06); margin: 14px 0 12px; }
+  .vdays { display: flex; gap: 5px; align-items: flex-end; height: 62px; }
+  .vday { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+  .vday i { display: block; width: 100%; max-width: 26px; border-radius: 2px 2px 0 0; min-height: 2px;
+    background: linear-gradient(180deg, #fb7299, #7a3450); }
+  .vday span { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+  .vday small { font-size: 9px; color: #4c4c58; white-space: nowrap; }
+  .vrecent { max-height: 168px; overflow-y: auto; font-family: var(--mono); font-size: 11px; }
+  .vrecent::-webkit-scrollbar { width: 6px; }
+  .vrecent::-webkit-scrollbar-thumb { background: #23232c; border-radius: 3px; }
+  .vr { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .vr:last-child { border-bottom: none; }
+  .vr .t { color: #41414c; flex: 0 0 auto; }
+  .vr .pg { flex: 0 0 auto; padding: 1px 5px; border-radius: 3px; font-size: 10px; }
+  .vr .pg.live { color: #9fd0ff; background: rgba(90,160,255,.12); }
+  .vr .pg.admin { color: #d3a45e; background: rgba(255,176,32,.1); }
+  .vr .who { color: #777784; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vr .new { color: var(--green); flex: 0 0 auto; }
+  .vempty { font-size: 11px; color: var(--dim2); padding: 8px 0; }
+
+  /* toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translate(-50%, 20px);
+    background: #1b1b24; border: 1px solid var(--line); color: var(--text);
+    padding: 11px 18px; border-radius: 8px; font-size: 13px; opacity: 0;
+    transition: all 0.22s; pointer-events: none; z-index: 200; box-shadow: 0 10px 40px rgba(0,0,0,.5);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.err { border-color: rgba(255, 46, 99, 0.45); color: #ff9db0; }
+  #toast.warn { border-color: rgba(255, 176, 32, 0.5); color: #f0d39a; }
+
+  /* login */
+  .login {
+    position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center;
+    background: #06060a;
+  }
+  .login .box {
+    width: 340px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 13px; padding: 26px;
+  }
+  .login h2 { font-size: 16px; margin-bottom: 6px; }
+  .login p { font-size: 12.5px; color: var(--dim); margin-bottom: 18px; line-height: 1.6; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 760px) {
+    .wrap { padding: 0 13px 40px; }
+    header.top { flex-direction: column; align-items: stretch; gap: 11px; padding: 13px 0; }
+    .logo h1 { font-size: 16px; white-space: nowrap; }
+    .logo span { display: none; }
+    .toolbar { width: 100%; gap: 7px; }
+    .toolbar .btn { padding: 7px 11px; font-size: 12px; flex: 0 1 auto; }
+    .toolbar .pill { font-size: 10.5px; padding: 5px 9px; }
+    .tbl thead { display: none; }
+    .tbl, .tbl tbody { display: block; }
+    .tbl tr {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      gap: 7px 10px; padding: 12px 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .tbl td { display: block; border: none !important; padding: 0 !important; }
+    .tbl td:nth-child(1) { grid-column: 1; grid-row: 1; min-width: 0; }
+    .tbl td:nth-child(3) { grid-column: 2; grid-row: 1; align-self: start; }
+    .tbl td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+    .tbl td:nth-child(6) { grid-column: 1 / -1; grid-row: 3; }
+    .tbl td:nth-child(4), .tbl td:nth-child(5) { display: none; }
+    .tbl tr.hot { background: rgba(255, 46, 99, 0.06); }
+    .tbl tr.hot td { background: transparent; }
+    .tbl tr.group-head { display: block; padding: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+    .tbl tr.group-head td { display: block; padding: 0 !important; }
+    .gh-inner { padding: 10px 13px; flex-wrap: wrap; gap: 7px 9px; }
+    .gh-name { max-width: 100%; font-size: 12.5px; }
+    .t-name { font-size: 12.5px; line-height: 1.35; flex-wrap: wrap; gap: 4px; }
+    .t-sub { font-size: 10px; line-height: 1.4; }
+    .ops { gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+    .ops .btn { padding: 4px 7px; font-size: 11px; }
+    .sw { width: 30px; height: 17px; }
+    .sw::after { width: 13px; height: 13px; }
+    .sw.on::after { left: 15px; }
+    .card-h { padding: 11px 13px; }
+    .card-b { padding: 13px; }
+    .state-tag { font-size: 10px; padding: 3px 6px; }
+    .row-input { flex-direction: column; }
+    .row-input .btn { width: 100%; justify-content: center; }
+    #resolveBox .screen-h { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .grid2 { grid-template-columns: 1fr; }
+    .logs { height: 240px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+  <div class="box">
+    <h2>余票监控 · 管理台</h2>
+    <p>请输入管理口令（默认 <code style="color:#fb7299">admin</code>，可在设置中修改）</p>
+    <div class="field"><input type="password" id="loginKey" placeholder="管理口令" /></div>
+    <button class="btn primary" style="width:100%;justify-content:center" id="loginBtn">进入管理台</button>
+    <p style="margin:14px 0 0"><a href="/" target="_blank">→ 打开直播大屏</a></p>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app">
+  <header class="top">
+    <div class="logo">
+      <span class="dot"></span>
+      <h1>余票监控</h1>
+      <span>ADMIN</span>
+    </div>
+    <div class="toolbar">
+      <span class="pill" id="runPill"><i></i><span>加载中</span></span>
+      <span class="pill" id="cntPill"><i style="background:#fb7299;box-shadow:0 0 8px #fb7299"></i><span>0 / 0 有票</span></span>
+      <button class="btn" id="btnStart">开始监控</button>
+      <button class="btn" id="btnStop">暂停</button>
+      <button class="btn ghost" id="btnCopyLive">复制直播链接</button>
+      <button class="btn ghost" id="btnOpenLive">直播大屏 ↗</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div>
+      <!-- 添加 -->
+      <div class="card">
+        <div class="card-h">
+          <h2>添加监控<em>ADD TARGET</em></h2>
+        </div>
+        <div class="card-b">
+          <div class="row-input">
+            <input id="projInput" placeholder="粘贴 b23 短链 / 会员购详情页链接 / 项目 ID" />
+            <button class="btn primary" id="btnResolve">解析</button>
+          </div>
+          <div class="hint">
+            支持 <code>https://b23.tv/xxxxx</code> 短链（自动展开）、<code>https://show.bilibili.com/platform/detail.html?id=1007693</code>、
+            微信分享的整段文案，以及纯数字 ID。解析后勾选要监控的票档即可，票档一旦从「售罄 / 未开售」变为「有票」，大屏会立即红色高亮并闪屏提示。
+          </div>
+
+          <div id="resolveBox">
+            <div class="short-note" id="resolveFrom"></div>
+            <div class="proj-head" id="projHead"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px">
+              <label class="check" style="margin:0"><input type="checkbox" id="checkAll" /> 全选票档</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input id="aliasInput" placeholder="大屏显示别名（可选）" style="width:190px;padding:6px 9px;font-size:12px" />
+                <button class="btn primary sm" id="btnAdd">添加所选</button>
+              </div>
+            </div>
+            <div id="screens"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 列表 -->
+      <div class="card">
+        <div class="card-h">
+          <h2>监控列表<em id="tblCount">0</em></h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn sm ghost" id="btnTestAlert">测试大屏告警</button>
+            <button class="btn sm ghost" id="btnClearLogs">清空日志</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="tbl" id="tbl">
+            <thead>
+              <tr>
+                <th style="width:34%">项目</th>
+                <th style="width:22%">场次 / 票档</th>
+                <th style="width:12%">状态</th>
+                <th style="width:10%">余票</th>
+                <th style="width:10%">检测时间</th>
+                <th style="width:12%;text-align:right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div id="emptyBox" class="empty-state">
+          <div class="b">还没有监控目标</div>
+          <div class="s">在上方解析一个会员购项目开始</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <!-- 设置 -->
+      <div class="card">
+        <div class="card-h"><h2>监控设置<em>SETTINGS</em></h2></div>
+        <div class="card-b">
+          <div class="field">
+            <label>大屏标题</label>
+            <input id="setTitle" maxlength="40" />
+          </div>
+          <div class="field">
+            <label>副标题 / 角标</label>
+            <input id="setSubtitle" maxlength="60" />
+          </div>
+          <div class="field">
+            <label>抢票节奏</label>
+            <div class="grid2">
+              <div>
+                <span class="mini-label">开售后（毫秒）</span>
+                <input type="number" id="setRush" min="100" max="5000" step="10" />
+              </div>
+              <div>
+                <span class="mini-label">售罄后（毫秒）</span>
+                <input type="number" id="setWatch" min="200" max="10000" step="10" />
+              </div>
+            </div>
+            <div class="grid2" style="margin-top:9px">
+              <div>
+                <span class="mini-label">回流持续（分钟）</span>
+                <input type="number" id="setWatchMin" min="0" max="240" />
+              </div>
+              <div>
+                <span class="mini-label">待开售确认（秒）</span>
+                <input type="number" id="setPending" min="1" max="600" />
+              </div>
+            </div>
+            <div class="grid2" style="margin-top:9px">
+              <div>
+                <span class="mini-label">开售前开始请求（秒）</span>
+                <input type="number" id="setWarmup" min="5" max="600" />
+              </div>
+              <div>
+                <span class="mini-label">有票观察（毫秒）</span>
+                <input type="number" id="setSteady" min="200" max="60000" step="100" />
+              </div>
+            </div>
+            <label class="check" style="margin-top:10px"><input type="checkbox" id="setQuiet" /> 开售前静默：到点前完全不请求接口（推荐，防风控）</label>
+            <div class="desc">
+              静默开启时，距开售还早的阶段<b>零请求</b>，只在开售前 N 秒启动（1s 一次），最后 5 秒加密到 200ms，开售瞬间转高频；
+              开始监控的那一刻仍会先真实查一次拿基准状态。关闭静默则退回「待开售确认」的低频轮询。
+              一旦售罄立即转「售罄后」刷回流，持续指定时长后降为 5s 长尾。
+              <b>保存后立即生效</b>，无需重启；超出范围会明确提示实际采用值。
+              <b>防风控硬下限：开售后 ≥100ms、售罄后 ≥200ms</b>，低于此值会按边界执行并提示（20ms 这类节奏会直接触发 412 封 IP）。
+              若接口返回 412，系统会自动<b>全局熔断</b>：所有项目暂停请求 30s 起、逐次翻倍最长 10 分钟，解封后强制 1s 低频恢复 1 分钟。
+            </div>
+          </div>
+
+          <div class="field">
+            <label>412 风控策略</label>
+            <div class="risk-box">
+              <div class="risk-line"><span class="rk">全局熔断</span><span class="rv" id="riskBreakerTxt">读取中…</span></div>
+              <div class="risk-line"><span class="rk">自适应延迟</span><span class="rv" id="riskAdaptTxt">读取中…</span></div>
+              <div class="risk-line"><span class="rk">开售避让</span><span class="rv" id="riskAvoidTxt">读取中…</span></div>
+              <div class="risk-line"><span class="rk">当前冷却</span><span class="rv" id="riskCoolTxt">正常</span></div>
+            </div>
+            <label class="check" style="margin-top:10px"><input type="checkbox" id="setAdaptive" /> 自适应轮询延迟：撞上 412 时自动拉长间隔（监控不中断）</label>
+            <label class="check" style="margin-bottom:6px"><input type="checkbox" id="setSaleAvoid" /> 开售避让：开售前自动暂停所有刷回流监控（防 IP 拉黑）</label>
+            <div style="display:flex;align-items:center;gap:8px;margin:0 0 9px 23px">
+              <span style="font-size:11px;color:var(--dim2)">提前</span>
+              <input type="number" id="setAvoidMin" min="1" max="30" step="1" style="width:62px;padding:5px 8px;font-size:12px" />
+              <span style="font-size:11px;color:var(--dim2)">分钟进入避让窗口（1–30，改后点保存设置）</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:2px;flex-wrap:wrap">
+              <button class="btn sm" id="btnBreaker">关闭 412 熔断</button>
+              <button class="btn sm ghost" id="btnClearRisk">立即解除冷却</button>
+            </div>
+            <div class="desc">
+              高峰期 B 站会短暂拉黑出口 IP，返回 412 属正常现象。<b>自适应延迟</b>命中 412 时把轮询间隔翻倍（最高 ×16），
+              连续 12 次请求正常后逐步回落到 ×1，全程持续请求、不漏解封瞬间的回流票；<b>全局熔断</b>则是命中 412 后所有项目零请求冷却。
+              更看重回流票可关闭熔断、只留自适应延迟。<b>开售避让</b>：只要有票档即将开售，提前 N 分钟自动<b>关闭所有刷回流 / 长尾监控任务</b>（零请求），
+              让出口 IP 在开抢前冷却下来，只保留即将开售项目自己的预热与抢票，开售后自动恢复。三项均<b>即时生效、无需重启</b>。
+            </div>
+          </div>
+
+          <div class="field">
+            <label>会员购 Cookie（可选）</label>
+            <textarea id="setCookie" rows="3" placeholder="SESSDATA=...; bili_jct=...; （可选，用于降低风控概率）"></textarea>
+            <div class="desc">不填也能查询。若频繁出现「请求失败 / 被风控」，从浏览器复制登录后的 Cookie 填入更稳定。</div>
+          </div>
+          <div class="field">
+            <label>直播大屏选项</label>
+            <label class="check"><input type="checkbox" id="setSound" /> 有新票时播放提示音</label>
+            <label class="check" style="margin-bottom:0"><input type="checkbox" id="setAutostart" /> 服务重启后自动开始监控</label>
+            <div class="desc">直播页按 <b>Tab / 空格 / ← → / 1 / 2</b> 切换「开票倒计时 ↔ 余票监控」，也可点右上角「视图」按钮；开售瞬间会自动切到余票列表。</div>
+          </div>
+          <div class="field">
+            <label>时钟校准 NTP</label>
+            <div class="ntp-row">
+              <span class="ntp-dot" id="ntpDot"></span>
+              <span class="ntp-text" id="ntpInfo">未校准</span>
+              <button class="btn sm ghost" id="btnNtp">校时</button>
+            </div>
+            <div class="ntp-sub" id="ntpSub"></div>
+            <div class="desc">开票前 60 秒自动校时一次，启动时也校一次；倒计时与开抢时刻以校时后的时间为准。</div>
+          </div>
+          <div class="field">
+            <label>管理口令</label>
+            <input id="setAdminKey" placeholder="至少 3 位" />
+          </div>
+          <button class="btn primary" style="width:100%;justify-content:center" id="btnSave">保存设置</button>
+          <div class="hint" id="ticketInfo">bili_ticket：检测中…</div>
+        </div>
+      </div>
+
+      <!-- 日志 -->
+      <div class="card">
+        <div class="card-h">
+          <h2>实时日志<em>LOG</em></h2>
+          <span class="pill on" style="font-size:10px"><i></i>LIVE</span>
+        </div>
+        <div class="logs" id="logBox"></div>
+      </div>
+
+      <!-- 访问统计 -->
+      <div class="card">
+        <div class="card-h">
+          <h2>访问统计<em>TRAFFIC</em></h2>
+          <button class="btn ghost" style="font-size:11px;padding:5px 10px" id="btnRefreshVisits">刷新</button>
+        </div>
+        <div class="card-b">
+          <div class="vstat">
+            <div><b id="vPV">0</b><span>累计浏览 PV</span></div>
+            <div><b id="vUV">0</b><span>独立访客 UV</span></div>
+            <div><b id="vTodayPV">0</b><span>今日 PV</span></div>
+            <div><b id="vTodayUV">0</b><span>今日访客</span></div>
+          </div>
+          <div class="vnote" id="vSince">统计自 —</div>
+          <div class="vsep"></div>
+          <div class="mini-label">最近 14 天浏览趋势</div>
+          <div class="vdays" id="vDays"></div>
+          <div class="mini-label" style="margin-top:14px">最近访问</div>
+          <div class="vrecent" id="vRecent"></div>
+          <div class="desc" style="margin-top:10px">
+            只统计直播页 / 管理台的页面打开，接口轮询、静态资源与健康检查不计入。
+            独立访客按「IP + 浏览器」去重，统计启用前的历史访问无法追溯。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  var KEY = localStorage.getItem('tm_key') || '';
+  var state = null;
+  var resolved = null;
+  var logRendered = 0;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function toast(msg, err) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.className = 'show' + (err === 'warn' ? ' warn' : err ? ' err' : '');
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.className = ''; }, 2600);
+  }
+  function money(fen) {
+    if (!fen) return '—';
+    return '¥' + (fen / 100).toFixed(fen % 100 === 0 ? 0 : 2);
+  }
+  function hhmmss(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts);
+    var p = function (n) { return n < 10 ? '0' + n : n; };
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+  var SC = new URLSearchParams(location.search).get('sharecode') || '';
+  function withSC(u) {
+    if (!SC) return u;
+    return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + encodeURIComponent(SC);
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(withSC(path), {
+      method: opts.method || 'GET',
+      headers: Object.assign({ 'Content-Type': 'application/json', 'x-admin-key': KEY }, opts.headers || {}),
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (r) {
+      if (r.status === 401) { showLogin(); throw new Error('未授权'); }
+      return r.json();
+    });
+  }
+
+  function showLogin() {
+    $('login').classList.remove('hidden');
+    $('app').classList.add('hidden');
+  }
+  function showApp() {
+    $('login').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    // 登录框刚隐藏时仍可能持有焦点，会让设置面板跳过首次回填
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  /* ---------- 登录 ---------- */
+  function tryLogin(key) {
+    return fetch(withSC('/api/admin/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key }),
+    }).then(function (r) { return r.json(); });
+  }
+  $('loginBtn').onclick = function () {
+    var k = $('loginKey').value.trim();
+    tryLogin(k).then(function (r) {
+      if (r.ok) {
+        KEY = k;
+        localStorage.setItem('tm_key', k);
+        showApp();
+        boot();
+      } else {
+        toast('口令错误', true);
+      }
+    }).catch(function () { toast('登录失败', true); });
+  };
+  $('loginKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('loginBtn').click(); });
+
+  /* ---------- 渲染 ---------- */
+  function render(next) {
+    state = next;
+    $('runPill').className = 'pill' + (next.running ? ' on' : '');
+    $('runPill').querySelector('span').textContent = next.running ? '运行中' : '已暂停';
+    $('cntPill').querySelector('span').textContent = next.stats.available + ' / ' + next.stats.total + ' 有票';
+    $('btnStart').disabled = !!next.running;
+    $('btnStop').disabled = !next.running;
+
+    var s = next.settings || {};
+    var ae = document.activeElement;
+    var editing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.offsetParent !== null;
+    if (editing) {
+      // 正在输入时不覆盖，避免把用户打了一半的字冲掉
+    } else {
+      $('setTitle').value = s.title || '';
+      $('setSubtitle').value = s.subtitle || '';
+      $('setCookie').value = s.cookie || '';
+      $('setSound').checked = !!s.liveSound;
+      $('setAutostart').checked = s.autostart !== false;
+      $('setAdminKey').value = s.adminKey || '';
+      renderClock(next.clock);
+      $('setRush').value = s.rushInterval || 100;
+      $('setWatch').value = s.watchInterval || 500;
+      $('setWatchMin').value = s.watchMinutes === undefined ? 15 : s.watchMinutes;
+      $('setPending').value = s.pendingInterval || 30;
+      $('setWarmup').value = s.warmupSeconds || 60;
+      $('setQuiet').checked = s.quiet !== false;
+      $('setSteady').value = s.steadyInterval || 2000;
+      $('setAdaptive').checked = s.adaptivePacing !== false;
+      $('setSaleAvoid').checked = s.saleAvoid !== false;
+      $('setAvoidMin').value = s.avoidMinutes === undefined ? 5 : s.avoidMinutes;
+    }
+
+    renderRisk(next);
+    renderTargets(next.targets || []);
+    renderLogs(next.logs || []);
+  }
+
+  function renderRisk(st) {
+    var risk = st.risk || {};
+    var ad = st.adaptive || {};
+    var bt = $('riskBreakerTxt'), at = $('riskAdaptTxt'), ct = $('riskCoolTxt'), btn = $('btnBreaker');
+    if (!bt || !btn) return;
+    if (risk.enabled === false) {
+      bt.textContent = '已关闭 · 只降频不停止'; bt.className = 'rv off';
+      btn.textContent = '开启 412 熔断'; btn.className = 'btn sm';
+    } else {
+      bt.textContent = '已开启 · 零请求冷却'; bt.className = 'rv on';
+      btn.textContent = '关闭 412 熔断'; btn.className = 'btn sm danger';
+    }
+    var mult = Number(ad.multiplier || 1);
+    at.textContent = ad.enabled === false
+      ? '已停用 · ×1'
+      : '已启用 · ×' + (Math.round(mult * 10) / 10) + (mult > 1 ? '（412 降频中）' : '');
+    at.className = 'rv ' + (ad.enabled === false ? 'off' : (mult > 1 ? 'hot' : 'on'));
+    var av = st.avoidance || {};
+    var avt = $('riskAvoidTxt');
+    if (avt) {
+      if (av.enabled === false) {
+        avt.textContent = '已停用'; avt.className = 'rv off';
+      } else if (av.active) {
+        avt.textContent = '避让中 · ' + (av.remaining || 0) + 's 后开售'; avt.className = 'rv hot';
+      } else {
+        avt.textContent = '待命 · 提前 ' + (av.minutes || 5) + ' 分钟'; avt.className = 'rv on';
+      }
+    }
+    if (risk.cooling) {
+      ct.textContent = '冷却中 · 剩余 ' + (risk.remaining || 0) + 's';
+      ct.className = 'rv hot';
+    } else if (risk.recovering) {
+      ct.textContent = '渐进恢复中 · 1s 低频';
+      ct.className = 'rv off';
+    } else {
+      ct.textContent = '正常 · 无冷却';
+      ct.className = 'rv on';
+    }
+  }
+
+  function agoText(ms) {
+    if (ms < 60000) return Math.max(1, Math.round(ms / 1000)) + ' 秒前';
+    if (ms < 3600000) return Math.round(ms / 60000) + ' 分钟前';
+    return Math.round(ms / 3600000) + ' 小时前';
+  }
+
+  function renderClock(c) {
+    if (!c) return;
+    var dot = $('ntpDot'), info = $('ntpInfo'), sub = $('ntpSub');
+    if (c.syncedAt) {
+      var sign = c.offset >= 0 ? '+' : '';
+      var src = c.source === 'ntp' ? c.host : (c.host || '接口时间');
+      info.textContent = '偏差 ' + sign + c.offset + 'ms · RTT ' + c.rtt + 'ms';
+      sub.textContent = src + ' · ' + agoText(c.age);
+      dot.className = 'ntp-dot' + (c.source === 'ntp' ? ' on' : '');
+    } else {
+      info.textContent = c.syncing ? '校准中…' : '未校准';
+      sub.textContent = c.error || '';
+      dot.className = 'ntp-dot';
+    }
+  }
+
+  var GROUP_COLORS = ['#fb7299', '#ffb020', '#4aa3ff', '#35d07f', '#b07cff', '#ff7a5c', '#37cfd0', '#e05fa8'];
+
+  // 按项目 ID 归类，组内保持后端给的原始顺序（有票等排序交给大屏，管理台按项目聚合）
+  function groupTargets(list) {
+    var map = new Map();
+    list.forEach(function (t) {
+      var pid = t.projectId || ('_' + t.id);
+      if (!map.has(pid)) map.set(pid, { pid: pid, name: t.projectName || t.name, items: [] });
+      map.get(pid).items.push(t);
+    });
+    return Array.from(map.values()).map(function (g) {
+      g.enabledCount = g.items.filter(function (t) { return t.enabled; }).length;
+      g.availCount = g.items.filter(function (t) { return t.available; }).length;
+      g.allEnabled = g.enabledCount === g.items.length;
+      g.partial = g.enabledCount > 0 && !g.allEnabled;
+      return g;
+    });
+  }
+
+  function rowHtml(t) {
+    var stCls = t.available ? 'av' : (t.status === 'presale' ? 'pre' : (t.status === 'error' ? 'err' : 'so'));
+    var stText = t.pending ? '确认中' : (t.available ? '有票' : (t.status === 'error' ? '异常' : (t.status === 'presale' ? '未开售' : (t.status === 'unknown' ? '待检测' : '无票'))));
+    var numText = !t.available ? '—' : (t.stock || '—');
+    if (t.stale) stText += '·延迟';
+    else if (t.silent && !t.available && t.status !== 'error') stText = '静默';
+    return '<tr class="' + (t.available ? 'hot' : '') + '" data-id="' + t.id + '">' +
+      '<td><div class="t-name">' + esc(t.name) + (t.alias ? '<span class="alias">' + esc(t.projectName) + '</span>' : '') + '</div>' +
+        '<div class="t-sub">ID ' + esc(t.projectId) + '</div></td>' +
+      '<td><div style="font-size:12.5px">' + esc(t.screen || t.screenStart) + '</div>' +
+        '<div class="t-sub">' + esc(t.ticket) + ' · ' + money(t.price) +
+        (t.saleStartText ? ' · 开售 ' + esc(t.saleStartText) : '') + '</div></td>' +
+      '<td><span class="state-tag ' + stCls + '">' + stText + '</span></td>' +
+      '<td class="t-mono" title="' + esc('sale_flag=' + (t.flagNumber === undefined ? '?' : t.flagNumber) + ' 可购=' + (t.num === null ? '?' : t.num) + ' 限购=' + (t.limit === null ? '?' : t.limit)) + '">' + esc(numText) + '</td>' +
+      '<td class="t-mono">' + (t.silent && !t.available ? '—' : esc(hhmmss(t.checkedAt))) + '</td>' +
+      '<td><div class="ops">' +
+        '<div class="sw ' + (t.enabled ? 'on' : '') + '" data-act="toggle" title="启用/停用"></div>' +
+        '<button class="btn sm ghost" data-act="check">检测</button>' +
+        '<button class="btn sm danger" data-act="del">删</button>' +
+      '</div></td></tr>';
+  }
+
+  function renderTargets(list) {
+    var tb = $('tbody');
+    $('tblCount').textContent = list.length + ' 项';
+    $('emptyBox').style.display = list.length ? 'none' : '';
+    if (!list.length) { tb.innerHTML = ''; return; }
+
+    var groups = groupTargets(list);
+    var html = groups.map(function (g, gi) {
+      var color = GROUP_COLORS[gi % GROUP_COLORS.length];
+      var stateTxt = g.allEnabled ? '全部启用' : (g.partial ? '部分启用' : '已停用');
+      var head = '<tr class="group-head" data-pid="' + esc(g.pid) + '"><td colspan="6">' +
+        '<div class="gh-inner">' +
+          '<span class="gh-bar" style="background:' + color + '"></span>' +
+          '<span class="gh-name">' + esc(g.name) + '</span>' +
+          '<span class="gh-id">ID ' + esc(g.pid) + '</span>' +
+          '<span class="gh-meta">' + g.items.length + ' 档 · 启用 ' + g.enabledCount + ' · 有票 ' + g.availCount + '</span>' +
+          '<span class="gh-sp"></span>' +
+          '<span class="gh-lbl">' + stateTxt + '</span>' +
+          '<div class="sw ' + (g.allEnabled ? 'on' : '') + '" data-act="toggle-project" data-pid="' + esc(g.pid) + '" title="开关该项目全部票档"></div>' +
+        '</div></td></tr>';
+      return head + g.items.map(rowHtml).join('');
+    }).join('');
+    tb.innerHTML = html;
+  }
+
+  function renderLogs(logs) {
+    var box = $('logBox');
+    var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    box.innerHTML = logs.map(function (l) {
+      return '<div class="ln ' + (l.level || 'info') + '"><span class="ts">' + (l.time || '') + '</span><span class="tx">' + esc(l.text) + '</span></div>';
+    }).join('');
+    if (nearBottom) box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---------- 目标操作 ---------- */
+  $('tbody').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    var tr = btn.closest('tr');
+    var id = tr.getAttribute('data-id');
+    var act = btn.getAttribute('data-act');
+    if (act === 'toggle-project') {
+      // 当前非「全部启用」→ 点击启用该项目全部票档；已全开 → 点击全部停用
+      var on = !btn.classList.contains('on');
+      api('/api/admin/projects/' + encodeURIComponent(btn.getAttribute('data-pid')),
+        { method: 'PATCH', body: { enabled: on } }).then(function () { refresh(); });
+      return;
+    }
+    if (act === 'del') {
+      if (!confirm('确定移除这个监控目标？')) return;
+      api('/api/admin/targets/' + id, { method: 'DELETE' }).then(function () { refresh(); });
+    } else if (act === 'check') {
+      btn.textContent = '…';
+      api('/api/admin/targets/' + id + '/check', { method: 'POST' }).then(function () { refresh(); });
+    } else if (act === 'toggle') {
+      var on = !btn.classList.contains('on');
+      api('/api/admin/targets/' + id, { method: 'PATCH', body: { enabled: on } }).then(function () { refresh(); });
+    }
+  });
+
+  /* ---------- 解析 ---------- */
+  $('btnResolve').onclick = function () {
+    var v = $('projInput').value.trim();
+    if (!v) return toast('请输入 b23 短链 / 项目链接 / ID', true);
+    var isShort = /b23\.tv|b23\.cn|bili2233/i.test(v);
+    var btn = $('btnResolve');
+    var note = $('resolveFrom');
+    btn.disabled = true; btn.textContent = isShort ? '展开短链…' : '解析中…';
+    note.style.display = 'none';
+    api('/api/admin/resolve?id=' + encodeURIComponent(v)).then(function (r) {
+      btn.disabled = false; btn.textContent = '解析';
+      if (r.resolvedFrom) {
+        note.innerHTML = '短链已展开（' + (r.resolvedFrom.hops || 0) + ' 跳）：<code>' +
+          esc(r.resolvedFrom.short) + '</code> → <code>' + esc(r.resolvedFrom.url) + '</code>';
+        note.style.display = 'block';
+      }
+      if (!r.ok) return toast(r.error || '解析失败', true);
+      resolved = r.project;
+      renderResolve(r.project);
+      $('resolveBox').style.display = 'block';
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = '解析';
+      toast(e.message || '解析失败', true);
+    });
+  };
+  $('projInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btnResolve').click(); });
+
+  function renderResolve(p) {
+    $('projHead').innerHTML =
+      '<img src="' + esc(p.cover) + '" onerror="this.remove()" />' +
+      '<div><div class="t">' + esc(p.name) + '</div>' +
+      '<div class="s">' + esc([p.city, p.venue].filter(Boolean).join(' · ')) + '<br>开售 ' + esc(p.saleStartText || '—') + ' · 共 ' + p.screens.length + ' 个场次</div></div>';
+
+    var total = 0;
+    var html = p.screens.map(function (s, si) {
+      var rows = s.tickets.map(function (t, ti) {
+        total++;
+        var cls = t.status === 'available' ? 'av' : (t.status === 'presale' ? 'pre' : 'so');
+        var txt = t.status === 'available' ? '有票' : (t.status === 'presale' ? '未开售' : (t.status === 'soldout' ? '无票' : t.flagName || '停售'));
+        return '<label class="tk">' +
+          '<input type="checkbox" class="tkchk" data-s="' + si + '" data-t="' + ti + '" />' +
+          '<span class="nm">' + esc(t.desc) + '</span>' +
+          '<span class="pr">' + money(t.price) + '</span>' +
+          '<span class="tag ' + cls + '">' + esc(txt) + '</span></label>';
+      }).join('');
+      return '<div class="screen-block"><div class="screen-h"><span class="n">' + esc(s.name) + '</span>' +
+        '<span class="d">' + esc(s.startText) + ' · ' + s.tickets.length + ' 个票档</span></div>' + rows + '</div>';
+    }).join('');
+    $('screens').innerHTML = html || '<div class="hint">该项目暂无可售票档</div>';
+    $('checkAll').checked = false;
+    $('btnAdd').textContent = '添加所选';
+  }
+
+  $('checkAll').onchange = function () {
+    var on = this.checked;
+    document.querySelectorAll('.tkchk').forEach(function (c) { c.checked = on; });
+    updateAddBtn();
+  };
+  document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('tkchk')) updateAddBtn();
+  });
+  function updateAddBtn() {
+    var n = document.querySelectorAll('.tkchk:checked').length;
+    $('btnAdd').textContent = n ? '添加所选 (' + n + ')' : '添加所选';
+  }
+
+  $('btnAdd').onclick = function () {
+    if (!resolved) return;
+    var items = [];
+    document.querySelectorAll('.tkchk:checked').forEach(function (c) {
+      var s = resolved.screens[Number(c.dataset.s)];
+      var t = s.tickets[Number(c.dataset.t)];
+      items.push({ screenId: s.id, ticketId: t.id });
+    });
+    if (!items.length) return toast('请至少勾选一个票档', true);
+    var btn = $('btnAdd');
+    btn.disabled = true;
+    api('/api/admin/targets', {
+      method: 'POST',
+      body: { projectId: resolved.id, items: items, alias: $('aliasInput').value.trim() },
+    }).then(function (r) {
+      btn.disabled = false;
+      if (!r.ok) return toast(r.error || '添加失败', true);
+      toast('已添加 ' + r.added + ' 个监控目标' + (r.skipped ? '，' + r.skipped + ' 个重复已跳过' : ''));
+      $('resolveBox').style.display = 'none';
+      $('projInput').value = '';
+      $('aliasInput').value = '';
+      resolved = null;
+      refresh();
+    }).catch(function (e) {
+      btn.disabled = false;
+      toast(e.message || '添加失败', true);
+    });
+  };
+
+  /* ---------- 控制 ---------- */
+  $('btnStart').onclick = function () {
+    api('/api/admin/monitor', { method: 'POST', body: { action: 'start' } }).then(function () { refresh(); });
+  };
+  $('btnStop').onclick = function () {
+    api('/api/admin/monitor', { method: 'POST', body: { action: 'stop' } }).then(function () { refresh(); });
+  };
+  $('btnOpenLive').onclick = function () { window.open(liveUrl(), '_blank'); };
+  function liveUrl() {
+    var u = new URL(location.href);
+    var code = u.searchParams.get('sharecode');
+    return u.origin + '/' + (code ? '?sharecode=' + encodeURIComponent(code) : '');
+  }
+  $('btnCopyLive').onclick = function () {
+    var link = liveUrl();
+    var done = function () { toast('直播链接已复制：' + link); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(link).then(done).catch(function () { fallbackCopy(link); done(); });
+    } else { fallbackCopy(link); done(); }
+  };
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+  $('btnTestAlert').onclick = function () {
+    api('/api/admin/test-alert', { method: 'POST', body: {} }).then(function (r) {
+      if (!r.ok) return toast(r.error || '无目标', true);
+      toast('已向大屏发送测试告警');
+    });
+  };
+  $('btnClearLogs').onclick = function () {
+    api('/api/admin/logs/clear', { method: 'POST' }).then(function () { refresh(); });
+  };
+
+  $('btnNtp').onclick = function () {
+    var btn = $('btnNtp');
+    btn.disabled = true;
+    btn.textContent = '校准中…';
+    api('/api/admin/ntp', { method: 'POST' }).then(function (r) {
+      btn.disabled = false;
+      btn.textContent = '校时';
+      if (!r.ok) return toast(r.error || '校时失败', true);
+      var sign = r.clock.offset >= 0 ? '+' : '';
+      toast('已校准：偏差 ' + sign + r.clock.offset + 'ms · RTT ' + r.clock.rtt + 'ms');
+      renderClock(r.clock);
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = '校时';
+      toast(e.message || '校时失败', true);
+    });
+  };
+
+  // 自适应策略开关即时生效，不必再点「保存设置」
+  $('setAdaptive').addEventListener('change', function () {
+    var on = this.checked;
+    api('/api/admin/settings', { method: 'POST', body: { adaptivePacing: on } }).then(function (r) {
+      if (!r.ok) return toast(r.error || '保存失败', true);
+      toast(on ? '自适应轮询延迟已启用' : '自适应轮询延迟已停用');
+      refresh();
+    }).catch(function (e) { toast(e.message || '保存失败', true); });
+  });
+
+  // 开售避让开关即时生效（分钟数走「保存设置」）
+  $('setSaleAvoid').addEventListener('change', function () {
+    var on = this.checked;
+    api('/api/admin/settings', { method: 'POST', body: { saleAvoid: on } }).then(function (r) {
+      if (!r.ok) return toast(r.error || '保存失败', true);
+      toast(on ? '开售避让已启用' : '开售避让已停用');
+      refresh();
+    }).catch(function (e) { toast(e.message || '保存失败', true); });
+  });
+
+  $('btnBreaker').onclick = function () {
+    var cur = state && state.risk ? state.risk.enabled !== false : true;
+    var btn = this;
+    btn.disabled = true;
+    api('/api/admin/risk', { method: 'POST', body: { action: 'breaker', enabled: !cur } }).then(function (r) {
+      btn.disabled = false;
+      if (!r.ok) return toast(r.error || '操作失败', true);
+      toast(r.enabled ? '412 全局熔断已开启' : '412 全局熔断已关闭 · 自适应延迟接管降频');
+      refresh();
+    }).catch(function (e) {
+      btn.disabled = false;
+      toast(e.message || '操作失败', true);
+    });
+  };
+
+  $('btnClearRisk').onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    api('/api/admin/risk', { method: 'POST', body: { action: 'clear' } }).then(function (r) {
+      btn.disabled = false;
+      if (!r.ok) return toast(r.error || '操作失败', true);
+      toast('已解除风控冷却 · 自适应倍率复位 ×1');
+      refresh();
+    }).catch(function (e) {
+      btn.disabled = false;
+      toast(e.message || '操作失败', true);
+    });
+  };
+
+  $('btnSave').onclick = function () {
+    // 空值走默认，0 是合法值（如回流持续 0 分钟），不能用 || 吞掉
+    function num(id, dft) {
+      var v = String($(id).value).trim();
+      if (v === '') return dft;
+      var n = Number(v);
+      return Number.isFinite(n) ? n : dft;
+    }
+    var body = {
+      title: $('setTitle').value,
+      subtitle: $('setSubtitle').value,
+      cookie: $('setCookie').value,
+      liveSound: $('setSound').checked,
+      autostart: $('setAutostart').checked,
+      adminKey: $('setAdminKey').value,
+      rushInterval: num('setRush', 100),
+      watchInterval: num('setWatch', 500),
+      watchMinutes: num('setWatchMin', 15),
+      pendingInterval: num('setPending', 30),
+      warmupSeconds: num('setWarmup', 60),
+      quiet: $('setQuiet').checked,
+      steadyInterval: num('setSteady', 2000),
+      adaptivePacing: $('setAdaptive').checked,
+      saleAvoid: $('setSaleAvoid').checked,
+      avoidMinutes: num('setAvoidMin', 5),
+    };
+    api('/api/admin/settings', { method: 'POST', body: body }).then(function (r) {
+      if (!r.ok) return toast(r.error || '保存失败', true);
+      if (r.settings.adminKey !== KEY) {
+        KEY = r.settings.adminKey;
+        localStorage.setItem('tm_key', KEY);
+      }
+      if (r.adjusted && r.adjusted.length) {
+        toast('已保存，但 ' + r.adjusted.join('；') + ' 超出允许范围，已按边界值生效', 'warn');
+      } else {
+        toast('设置已保存 · 已即时生效');
+      }
+      refresh();
+    });
+  };
+
+  /* ---------- 数据 ---------- */
+  function refresh() {
+    return api('/api/admin/state').then(render).catch(function () {});
+  }
+
+  function loadVisits() {
+    return api('/api/admin/visits').then(function (r) {
+      if (!r || !r.ok) return;
+      $('vPV').textContent = r.pv;
+      $('vUV').textContent = r.uv;
+      $('vTodayPV').textContent = r.today.pv;
+      $('vTodayUV').textContent = r.today.uv;
+      $('vSince').textContent = '统计自 ' + r.sinceText + '　·　直播页 ' + r.pvLive + ' / 管理台 ' + r.pvAdmin;
+      var days = r.days || [];
+      var max = Math.max.apply(null, days.map(function (d) { return d.pv; }).concat([1]));
+      $('vDays').innerHTML = days.length ? days.map(function (d) {
+        var h = Math.max(2, Math.round(d.pv / max * 40));
+        return '<div class="vday" title="' + esc(d.date) + ' · ' + d.pv + ' 次浏览 / ' + d.uv + ' 位访客">'
+          + '<span>' + d.pv + '</span><i style="height:' + h + 'px"></i><small>' + esc(d.date.slice(5)) + '</small></div>';
+      }).join('') : '<div class="vempty">暂无数据</div>';
+      var rec = r.recent || [];
+      $('vRecent').innerHTML = rec.length ? rec.map(function (x) {
+        return '<div class="vr"><span class="t">' + esc(x.time.slice(5)) + '</span>'
+          + '<span class="pg ' + esc(x.page) + '">' + (x.page === 'live' ? '大屏' : '管理台') + '</span>'
+          + '<span class="who">' + esc(x.ip) + ' · ' + esc(x.ua) + '</span>'
+          + (x.new ? '<span class="new">NEW</span>' : '') + '</div>';
+      }).join('') : '<div class="vempty">还没有访问记录，分享直播链接后这里会出现数据。</div>';
+    }).catch(function () {});
+  }
+  $('btnRefreshVisits').addEventListener('click', loadVisits);
+
+  function tickTicket() {
+    api('/api/admin/ticket').then(function (r) {
+      if (!r.ok) { $('ticketInfo').textContent = 'bili_ticket：获取失败（' + (r.error || '') + '）'; return; }
+      var d = new Date(r.exp * 1000);
+      $('ticketInfo').textContent = 'bili_ticket 有效至 ' + d.toLocaleString('zh-CN', { hour12: false }) + '（' + (r.cached ? '缓存' : '新获取') + '）';
+    }).catch(function () {});
+  }
+
+  var pollTimer = null;
+  function boot() {
+    refresh().then(function () {
+      tickTicket();
+      loadVisits();
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(refresh, 2500);
+      setInterval(tickTicket, 1000 * 60 * 30);
+      setInterval(loadVisits, 30000);
+      // 日志走 SSE，实时追加
+      var es = new EventSource(withSC('/api/live/stream'));
+      es.addEventListener('log', function (ev) {
+        try {
+          var l = JSON.parse(ev.data);
+          var box = $('logBox');
+          var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+          var div = document.createElement('div');
+          div.className = 'ln ' + (l.level || 'info');
+          div.innerHTML = '<span class="ts">' + esc(l.time) + '</span><span class="tx">' + esc(l.text) + '</span>';
+          box.appendChild(div);
+          while (box.children.length > 300) box.removeChild(box.firstChild);
+          if (nearBottom) box.scrollTop = box.scrollHeight;
+        } catch (e) {}
+      });
+    });
+  }
+
+  var urlKey = new URLSearchParams(location.search).get('key');
+  if (urlKey) { KEY = urlKey; localStorage.setItem('tm_key', KEY); }
+  if (KEY) {
+    tryLogin(KEY).then(function (r) {
+      if (r.ok) { showApp(); boot(); } else { showLogin(); }
+    }).catch(showLogin);
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>

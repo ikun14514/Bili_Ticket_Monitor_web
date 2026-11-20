@@ -1,0 +1,22 @@
+# ===== 运行时数据（含配置、Cookie、管理口令、访客 IP/UA，绝不入库）=====
+data/*.json
+data/*.tmp
+data/*.log
+
+# 保留 data 目录本身，但忽略其中所有实际数据文件
+!data/.gitkeep
+
+# ===== 依赖 =====
+node_modules/
+
+# ===== 日志与临时文件 =====
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# ===== 环境变量与本地密钥 =====
+.env
+.env.*
+!.env.example
