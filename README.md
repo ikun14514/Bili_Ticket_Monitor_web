@@ -10,6 +10,8 @@
 
 零第三方依赖，单端口 Node 服务。
 
+> **关于本项目**：本项目的全部代码由 AI（腾讯混元）辅助生成，仅用于学习与个人技术研究。作者未逐行审阅所有实现细节，使用时请自行评估与验证；详见文末「免责声明」。
+
 ---
 
 ## 快速开始
@@ -17,8 +19,8 @@
 需要 **Node.js 18+**，无需 `npm install`（零依赖）：
 
 ```bash
-git clone <你的仓库地址>
-cd bili-ticket-monitor
+git clone https://github.com/ikun14514/Bili_Ticket_Monitor_web.git
+cd Bili_Ticket_Monitor_web
 node server.js          # 默认 3000 端口，可用 PORT 环境变量覆盖
 ```
 
