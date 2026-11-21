@@ -254,32 +254,6 @@
   .ln.system .tx { color: #5d7a8d; }
   .ln.info .tx { color: #7f8f7f; }
 
-  /* 访问统计 */
-  .vstat { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-  .vstat > div { background: #101018; border: 1px solid rgba(255,255,255,.055); border-radius: 6px; padding: 10px 12px; }
-  .vstat b { display: block; font-family: var(--mono); font-size: 25px; font-weight: 600; color: #fff; line-height: 1.25; }
-  .vstat span { font-size: 11px; color: var(--dim2); }
-  .vnote { font-family: var(--mono); font-size: 11px; color: var(--dim2); margin-top: 10px; }
-  .vsep { height: 1px; background: rgba(255,255,255,.06); margin: 14px 0 12px; }
-  .vdays { display: flex; gap: 5px; align-items: flex-end; height: 62px; }
-  .vday { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
-  .vday i { display: block; width: 100%; max-width: 26px; border-radius: 2px 2px 0 0; min-height: 2px;
-    background: linear-gradient(180deg, #fb7299, #7a3450); }
-  .vday span { font-family: var(--mono); font-size: 10px; color: var(--dim); }
-  .vday small { font-size: 9px; color: #4c4c58; white-space: nowrap; }
-  .vrecent { max-height: 168px; overflow-y: auto; font-family: var(--mono); font-size: 11px; }
-  .vrecent::-webkit-scrollbar { width: 6px; }
-  .vrecent::-webkit-scrollbar-thumb { background: #23232c; border-radius: 3px; }
-  .vr { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
-  .vr:last-child { border-bottom: none; }
-  .vr .t { color: #41414c; flex: 0 0 auto; }
-  .vr .pg { flex: 0 0 auto; padding: 1px 5px; border-radius: 3px; font-size: 10px; }
-  .vr .pg.live { color: #9fd0ff; background: rgba(90,160,255,.12); }
-  .vr .pg.admin { color: #d3a45e; background: rgba(255,176,32,.1); }
-  .vr .who { color: #777784; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vr .new { color: var(--green); flex: 0 0 auto; }
-  .vempty { font-size: 11px; color: var(--dim2); padding: 8px 0; }
-
   /* toast */
   #toast {
     position: fixed; left: 50%; bottom: 30px; transform: translate(-50%, 20px);
@@ -563,31 +537,6 @@
         <div class="logs" id="logBox"></div>
       </div>
 
-      <!-- 访问统计 -->
-      <div class="card">
-        <div class="card-h">
-          <h2>访问统计<em>TRAFFIC</em></h2>
-          <button class="btn ghost" style="font-size:11px;padding:5px 10px" id="btnRefreshVisits">刷新</button>
-        </div>
-        <div class="card-b">
-          <div class="vstat">
-            <div><b id="vPV">0</b><span>累计浏览 PV</span></div>
-            <div><b id="vUV">0</b><span>独立访客 UV</span></div>
-            <div><b id="vTodayPV">0</b><span>今日 PV</span></div>
-            <div><b id="vTodayUV">0</b><span>今日访客</span></div>
-          </div>
-          <div class="vnote" id="vSince">统计自 —</div>
-          <div class="vsep"></div>
-          <div class="mini-label">最近 14 天浏览趋势</div>
-          <div class="vdays" id="vDays"></div>
-          <div class="mini-label" style="margin-top:14px">最近访问</div>
-          <div class="vrecent" id="vRecent"></div>
-          <div class="desc" style="margin-top:10px">
-            只统计直播页 / 管理台的页面打开，接口轮询、静态资源与健康检查不计入。
-            独立访客按「IP + 浏览器」去重，统计启用前的历史访问无法追溯。
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -1123,32 +1072,6 @@
     return api('/api/admin/state').then(render).catch(function () {});
   }
 
-  function loadVisits() {
-    return api('/api/admin/visits').then(function (r) {
-      if (!r || !r.ok) return;
-      $('vPV').textContent = r.pv;
-      $('vUV').textContent = r.uv;
-      $('vTodayPV').textContent = r.today.pv;
-      $('vTodayUV').textContent = r.today.uv;
-      $('vSince').textContent = '统计自 ' + r.sinceText + '　·　直播页 ' + r.pvLive + ' / 管理台 ' + r.pvAdmin;
-      var days = r.days || [];
-      var max = Math.max.apply(null, days.map(function (d) { return d.pv; }).concat([1]));
-      $('vDays').innerHTML = days.length ? days.map(function (d) {
-        var h = Math.max(2, Math.round(d.pv / max * 40));
-        return '<div class="vday" title="' + esc(d.date) + ' · ' + d.pv + ' 次浏览 / ' + d.uv + ' 位访客">'
-          + '<span>' + d.pv + '</span><i style="height:' + h + 'px"></i><small>' + esc(d.date.slice(5)) + '</small></div>';
-      }).join('') : '<div class="vempty">暂无数据</div>';
-      var rec = r.recent || [];
-      $('vRecent').innerHTML = rec.length ? rec.map(function (x) {
-        return '<div class="vr"><span class="t">' + esc(x.time.slice(5)) + '</span>'
-          + '<span class="pg ' + esc(x.page) + '">' + (x.page === 'live' ? '大屏' : '管理台') + '</span>'
-          + '<span class="who">' + esc(x.ip) + ' · ' + esc(x.ua) + '</span>'
-          + (x.new ? '<span class="new">NEW</span>' : '') + '</div>';
-      }).join('') : '<div class="vempty">还没有访问记录，分享直播链接后这里会出现数据。</div>';
-    }).catch(function () {});
-  }
-  $('btnRefreshVisits').addEventListener('click', loadVisits);
-
   function tickTicket() {
     api('/api/admin/ticket').then(function (r) {
       if (!r.ok) { $('ticketInfo').textContent = 'bili_ticket：获取失败（' + (r.error || '') + '）'; return; }
@@ -1161,11 +1084,9 @@
   function boot() {
     refresh().then(function () {
       tickTicket();
-      loadVisits();
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(refresh, 2500);
       setInterval(tickTicket, 1000 * 60 * 30);
-      setInterval(loadVisits, 30000);
       // 日志走 SSE，实时追加
       var es = new EventSource(withSC('/api/live/stream'));
       es.addEventListener('log', function (ev) {

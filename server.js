@@ -17,7 +17,6 @@ const {
   stockText,
 } = require('./lib/bili');
 const clock = require('./lib/clock');
-const visits = require('./lib/visits');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -325,8 +324,6 @@ async function handleApi(req, res, url) {
 
     if (p === '/api/admin/state' && method === 'GET') return json(res, 200, adminState());
 
-    if (p === '/api/admin/visits' && method === 'GET') return json(res, 200, visits.summary());
-
     if (p === '/api/admin/settings' && method === 'POST') {
       const body = await readBody(req);
       const prev = { ...store.settings };
@@ -583,9 +580,6 @@ const server = http.createServer(async (req, res) => {
     });
     return res.end();
   }
-
-  // 访问统计：只记 HTML 页面 GET，API / 静态资源 / 健康检查不计入
-  if (req.method === 'GET') visits.record(req, p, url);
 
   try {
     if (p.startsWith('/api/')) return await handleApi(req, res, url);
